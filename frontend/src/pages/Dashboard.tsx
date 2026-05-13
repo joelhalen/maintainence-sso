@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import api from '../api/client';
-import { Ticket, AlertTriangle, CheckCircle, Clock, Wrench } from 'lucide-react';
+import { Ticket, AlertTriangle, CheckCircle, Wrench } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 
 interface SummaryData {
@@ -9,11 +9,6 @@ interface SummaryData {
   overdueCount: number;
   avgActualHours: number | null;
 }
-
-const STATUS_COLORS: Record<string, string> = {
-  OPEN: '#3b82f6', IN_PROGRESS: '#f59e0b', ON_HOLD: '#6b7280',
-  PENDING_PARTS: '#f97316', COMPLETED: '#22c55e', CLOSED: '#9ca3af',
-};
 
 const PRIORITY_COLORS: Record<string, string> = {
   LOW: '#22c55e', MEDIUM: '#f59e0b', HIGH: '#f97316', CRITICAL: '#ef4444',
