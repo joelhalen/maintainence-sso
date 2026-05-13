@@ -26,6 +26,7 @@ export interface Location {
   name: string;
   code?: string;
   description?: string;
+  address?: string;
   parentId?: string;
   parent?: Pick<Location, 'id' | 'name'>;
   children?: Location[];
