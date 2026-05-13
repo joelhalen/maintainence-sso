@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { MapPin, Plus, ChevronRight, Pencil } from 'lucide-react';
 import api from '../api/client';
 import { Location } from '../types';

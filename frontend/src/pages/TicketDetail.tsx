@@ -21,7 +21,7 @@ export default function TicketDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const qc = useQueryClient();
-  const { user, hasPermission } = useAuth();
+  const { hasPermission } = useAuth();
   const [comment, setComment] = useState('');
   const [isInternal, setIsInternal] = useState(false);
 

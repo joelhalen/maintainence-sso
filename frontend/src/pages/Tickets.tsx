@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { Plus, Search, Filter } from 'lucide-react';
+import { Plus, Search } from 'lucide-react';
 import api from '../api/client';
 import { Ticket, TicketStatus, TicketPriority, PaginatedResult } from '../types';
 import StatusBadge from '../components/StatusBadge';

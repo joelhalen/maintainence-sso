@@ -12,7 +12,7 @@ interface NotificationPref {
 }
 
 export default function NotificationSettingsPage() {
-  const { user } = useAuth();
+  useAuth();
   const qc = useQueryClient();
 
   const { data: prefs, isLoading } = useQuery<NotificationPref>({
