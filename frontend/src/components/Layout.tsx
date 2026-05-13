@@ -34,7 +34,7 @@ export default function Layout() {
       )}>
         <div className="flex items-center justify-between h-16 px-4 border-b border-gray-700 flex-shrink-0">
           <div>
-            <div className="text-sm font-bold text-white">MegaFood</div>
+            <div className="text-sm font-bold text-white">MegaMTX</div>
             <div className="text-xs text-gray-400">Maintenance System</div>
           </div>
           <button onClick={() => setSidebarOpen(false)} className="lg:hidden text-gray-400 hover:text-white">
@@ -89,7 +89,7 @@ export default function Layout() {
             <Menu size={20} />
           </button>
           <div className="text-sm text-gray-500 flex items-center gap-1">
-            <span>MegaFood</span>
+            <span>MegaMTX</span>
             <ChevronRight size={14} />
             <span className="text-gray-900 font-medium">Maintenance</span>
           </div>

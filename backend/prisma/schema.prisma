@@ -106,6 +106,7 @@ model User {
   auditLogs         AuditLog[]
   notificationPref  NotificationPreference?
   signatures        ElectronicSignature[]
+  deviceTokens      DeviceToken[]
 
   @@index([email])
   @@index([roleId])
@@ -339,4 +340,24 @@ model NotificationPreference {
   onStatusChange  Boolean @default(true)
   onDueDateRemind Boolean @default(true)
   emailEnabled    Boolean @default(true)
+}
+
+// ─── Mobile Push Notification Device Tokens ────────────────────────────────────
+
+enum DevicePlatform {
+  IOS
+  ANDROID
+}
+
+model DeviceToken {
+  id        String         @id @default(cuid())
+  userId    String
+  user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token     String         @unique
+  platform  DevicePlatform
+  active    Boolean        @default(true)
+  lastSeen  DateTime       @default(now())
+  createdAt DateTime       @default(now())
+
+  @@index([userId])
 }

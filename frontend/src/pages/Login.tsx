@@ -30,7 +30,7 @@ export default function LoginPage() {
               <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke="currentColor" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
           </div>
-          <h1 className="text-2xl font-bold text-white">MegaFood Maintenance</h1>
+          <h1 className="text-2xl font-bold text-white">MegaMTX</h1>
           <p className="text-gray-400 text-sm mt-1">Sign in to your account</p>
         </div>
 
@@ -48,7 +48,7 @@ export default function LoginPage() {
               onChange={(e) => setEmail(e.target.value)}
               required
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              placeholder="you@megafood.com"
+              placeholder="you@megamtx.local"
             />
           </div>
           <div>

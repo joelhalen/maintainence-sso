@@ -79,10 +79,10 @@ async function main() {
   if (!superAdminRole) throw new Error('Super Admin role not found');
 
   await prisma.user.upsert({
-    where: { email: 'admin@megafood.com' },
+    where: { email: 'admin@megamtx.local' },
     update: {},
     create: {
-      email: 'admin@megafood.com',
+      email: 'admin@megamtx.local',
       name: 'System Administrator',
       passwordHash: await bcrypt.hash('Admin@123!', 12),
       roleId: superAdminRole.id,
@@ -90,7 +90,7 @@ async function main() {
       active: true,
     },
   });
-  console.log('  Default admin user created: admin@megafood.com');
+  console.log('  Default admin user created: admin@megamtx.local');
 
   const defaultLocations = [
     { name: 'Main Facility', code: 'MAIN', description: 'Main production facility' },

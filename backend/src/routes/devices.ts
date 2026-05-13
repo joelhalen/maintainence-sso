@@ -1,0 +1,63 @@
+import { Router, Response, NextFunction } from 'express';
+import { body, validationResult } from 'express-validator';
+import { AuthRequest } from '../types';
+import { authenticate } from '../middleware/auth';
+import { AppError } from '../middleware/errorHandler';
+import prisma from '../config/database';
+
+const router = Router();
+router.use(authenticate);
+
+// Register or refresh a device push token
+router.post(
+  '/',
+  [
+    body('token').trim().notEmpty(),
+    body('platform').isIn(['IOS', 'ANDROID']),
+  ],
+  async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      next(new AppError(400, errors.array()[0].msg as string));
+      return;
+    }
+    try {
+      const { token, platform } = req.body;
+      const device = await prisma.deviceToken.upsert({
+        where: { token },
+        update: {
+          userId: req.user!.id,
+          platform,
+          active: true,
+          lastSeen: new Date(),
+        },
+        create: {
+          userId: req.user!.id,
+          token,
+          platform,
+        },
+      });
+      res.status(201).json(device);
+    } catch (e) {
+      next(e);
+    }
+  }
+);
+
+// Deregister a device token (on logout from mobile)
+router.delete(
+  '/:token',
+  async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      await prisma.deviceToken.updateMany({
+        where: { token: req.params.token, userId: req.user!.id },
+        data: { active: false },
+      });
+      res.status(204).send();
+    } catch (e) {
+      next(e);
+    }
+  }
+);
+
+export default router;

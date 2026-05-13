@@ -12,6 +12,10 @@ import locationsRouter from './routes/locations';
 import assetsRouter from './routes/assets';
 import usersRouter from './routes/users';
 import reportsRouter from './routes/reports';
+import devicesRouter from './routes/devices';
+import attachmentsRouter from './routes/attachments';
+import signaturesRouter from './routes/signatures';
+import exportRouter from './routes/export';
 import { errorHandler, notFound } from './middleware/errorHandler';
 import { logger } from './config/logger';
 
@@ -42,6 +46,10 @@ app.use('/api/locations', locationsRouter);
 app.use('/api/assets', assetsRouter);
 app.use('/api/users', usersRouter);
 app.use('/api/reports', reportsRouter);
+app.use('/api/devices', devicesRouter);
+app.use('/api/attachments', attachmentsRouter);
+app.use('/api/signatures', signaturesRouter);
+app.use('/api/export', exportRouter);
 
 app.get('/api/health', (_req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }));
 
