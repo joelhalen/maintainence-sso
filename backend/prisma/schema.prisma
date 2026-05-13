@@ -1,0 +1,363 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ───────────────────────────────────────────────────────────────────
+
+enum Permission {
+  TICKET_CREATE
+  TICKET_READ
+  TICKET_UPDATE
+  TICKET_DELETE
+  TICKET_ASSIGN
+  TICKET_CLOSE
+  TICKET_EXPORT
+  USER_CREATE
+  USER_READ
+  USER_UPDATE
+  USER_DELETE
+  USER_ASSIGN_ROLE
+  LOCATION_CREATE
+  LOCATION_READ
+  LOCATION_UPDATE
+  LOCATION_DELETE
+  ASSET_CREATE
+  ASSET_READ
+  ASSET_UPDATE
+  ASSET_DELETE
+  REPORT_VIEW
+  REPORT_EXPORT
+  ADMIN_PANEL
+  AUDIT_LOG_VIEW
+  EMAIL_SETTINGS
+}
+
+enum TicketStatus {
+  OPEN
+  IN_PROGRESS
+  ON_HOLD
+  PENDING_PARTS
+  PENDING_REVIEW
+  COMPLETED
+  CLOSED
+  CANCELLED
+}
+
+enum TicketPriority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum TicketType {
+  CORRECTIVE
+  PREVENTIVE
+  INSPECTION
+  SAFETY
+  PROJECT
+}
+
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+  LOGIN
+  LOGOUT
+  LOGIN_FAILED
+  PASSWORD_CHANGE
+  ROLE_CHANGE
+  STATUS_CHANGE
+  ASSIGN
+  UNASSIGN
+  EXPORT
+  SIGN
+}
+
+// ─── Users & Auth ─────────────────────────────────────────────────────────────
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String
+  passwordHash  String?
+  ssoId         String?   @unique
+  ssoProvider   String?
+  roleId        String
+  role          Role      @relation(fields: [roleId], references: [id])
+  department    String?
+  phone         String?
+  active        Boolean   @default(true)
+  lastLoginAt   DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  createdTickets    Ticket[]         @relation("TicketCreatedBy")
+  assignedTickets   Ticket[]         @relation("TicketAssignedTo")
+  completedTickets  Ticket[]         @relation("TicketCompletedBy")
+  closedTickets     Ticket[]         @relation("TicketClosedBy")
+  comments          TicketComment[]
+  statusHistory     TicketStatusHistory[]
+  auditLogs         AuditLog[]
+  notificationPref  NotificationPreference?
+  signatures        ElectronicSignature[]
+  deviceTokens      DeviceToken[]
+
+  @@index([email])
+  @@index([roleId])
+}
+
+model Role {
+  id          String       @id @default(cuid())
+  name        String       @unique
+  description String?
+  permissions Permission[]
+  users       User[]
+  isSystem    Boolean      @default(false)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+}
+
+// ─── Locations ────────────────────────────────────────────────────────────────
+
+model Location {
+  id          String     @id @default(cuid())
+  name        String
+  code        String?    @unique
+  description String?
+  address     String?
+  parentId    String?
+  parent      Location?  @relation("LocationHierarchy", fields: [parentId], references: [id])
+  children    Location[] @relation("LocationHierarchy")
+  assets      Asset[]
+  tickets     Ticket[]
+  active      Boolean    @default(true)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  @@index([parentId])
+}
+
+// ─── Assets / Equipment ───────────────────────────────────────────────────────
+
+model AssetCategory {
+  id     String  @id @default(cuid())
+  name   String  @unique
+  assets Asset[]
+}
+
+model Asset {
+  id            String        @id @default(cuid())
+  name          String
+  assetTag      String?       @unique
+  serialNumber  String?
+  model         String?
+  manufacturer  String?
+  categoryId    String
+  category      AssetCategory @relation(fields: [categoryId], references: [id])
+  locationId    String
+  location      Location      @relation(fields: [locationId], references: [id])
+  description   String?
+  installDate   DateTime?
+  warrantyExp   DateTime?
+  qrCode        String?       @unique
+  specifications Json?
+  active        Boolean       @default(true)
+  tickets       Ticket[]
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@index([locationId])
+  @@index([categoryId])
+}
+
+// ─── Tickets ──────────────────────────────────────────────────────────────────
+
+model Ticket {
+  id            String         @id @default(cuid())
+  ticketNumber  String         @unique
+  title         String
+  description   String
+  type          TicketType     @default(CORRECTIVE)
+  status        TicketStatus   @default(OPEN)
+  priority      TicketPriority @default(MEDIUM)
+
+  locationId    String
+  location      Location       @relation(fields: [locationId], references: [id])
+  assetId       String?
+  asset         Asset?         @relation(fields: [assetId], references: [id])
+
+  createdById   String
+  createdBy     User           @relation("TicketCreatedBy", fields: [createdById], references: [id])
+  assignedToId  String?
+  assignedTo    User?          @relation("TicketAssignedTo", fields: [assignedToId], references: [id])
+  completedById String?
+  completedBy   User?          @relation("TicketCompletedBy", fields: [completedById], references: [id])
+  closedById    String?
+  closedBy      User?          @relation("TicketClosedBy", fields: [closedById], references: [id])
+
+  dueDate          DateTime?
+  startedAt        DateTime?
+  completedAt      DateTime?
+  closedAt         DateTime?
+  estimatedHours   Decimal?      @db.Decimal(8, 2)
+  actualHours      Decimal?      @db.Decimal(8, 2)
+  resolutionNotes  String?
+  tags             String[]
+
+  comments         TicketComment[]
+  attachments      Attachment[]
+  statusHistory    TicketStatusHistory[]
+  emailLogs        EmailLog[]
+  signatures       ElectronicSignature[]
+
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  @@index([status])
+  @@index([priority])
+  @@index([locationId])
+  @@index([assignedToId])
+  @@index([createdById])
+  @@index([createdAt])
+}
+
+model TicketComment {
+  id         String   @id @default(cuid())
+  ticketId   String
+  ticket     Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  authorId   String
+  author     User     @relation(fields: [authorId], references: [id])
+  content    String
+  isInternal Boolean  @default(false)
+  editedAt   DateTime?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([ticketId])
+}
+
+model TicketStatusHistory {
+  id          String        @id @default(cuid())
+  ticketId    String
+  ticket      Ticket        @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  fromStatus  TicketStatus?
+  toStatus    TicketStatus
+  changedById String
+  changedBy   User          @relation(fields: [changedById], references: [id])
+  reason      String?
+  createdAt   DateTime      @default(now())
+
+  @@index([ticketId])
+}
+
+model Attachment {
+  id           String   @id @default(cuid())
+  ticketId     String
+  ticket       Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  filename     String
+  originalName String
+  url          String
+  mimeType     String
+  sizeBytes    Int
+  uploadedById String
+  createdAt    DateTime @default(now())
+
+  @@index([ticketId])
+}
+
+// ─── Electronic Signatures (21 CFR Part 11) ───────────────────────────────────
+
+model ElectronicSignature {
+  id        String   @id @default(cuid())
+  ticketId  String
+  ticket    Ticket   @relation(fields: [ticketId], references: [id])
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  meaning   String
+  hash      String
+  ipAddress String?
+  signedAt  DateTime @default(now())
+
+  @@index([ticketId])
+}
+
+// ─── Audit Log (21 CFR Part 11) ───────────────────────────────────────────────
+
+model AuditLog {
+  id         String      @id @default(cuid())
+  userId     String?
+  user       User?       @relation(fields: [userId], references: [id])
+  action     AuditAction
+  resource   String
+  resourceId String?
+  oldValues  Json?
+  newValues  Json?
+  ipAddress  String?
+  userAgent  String?
+  notes      String?
+  createdAt  DateTime    @default(now())
+
+  @@index([userId])
+  @@index([resource, resourceId])
+  @@index([createdAt])
+  @@index([action])
+}
+
+// ─── Email Logs ───────────────────────────────────────────────────────────────
+
+model EmailLog {
+  id           String   @id @default(cuid())
+  to           String[]
+  cc           String[]
+  subject      String
+  templateName String?
+  status       String
+  errorMessage String?
+  ticketId     String?
+  ticket       Ticket?  @relation(fields: [ticketId], references: [id])
+  messageId    String?
+  sentAt       DateTime?
+  createdAt    DateTime @default(now())
+
+  @@index([ticketId])
+  @@index([status])
+}
+
+// ─── Notification Preferences ─────────────────────────────────────────────────
+
+model NotificationPreference {
+  id              String  @id @default(cuid())
+  userId          String  @unique
+  user            User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  onAssign        Boolean @default(true)
+  onComment       Boolean @default(true)
+  onStatusChange  Boolean @default(true)
+  onDueDateRemind Boolean @default(true)
+  emailEnabled    Boolean @default(true)
+}
+
+// ─── Mobile Push Notification Device Tokens ────────────────────────────────────
+
+enum DevicePlatform {
+  IOS
+  ANDROID
+}
+
+model DeviceToken {
+  id        String         @id @default(cuid())
+  userId    String
+  user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token     String         @unique
+  platform  DevicePlatform
+  active    Boolean        @default(true)
+  lastSeen  DateTime       @default(now())
+  createdAt DateTime       @default(now())
+
+  @@index([userId])
+}
