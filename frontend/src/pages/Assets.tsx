@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Search, Plus, Pencil } from 'lucide-react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { Search, Plus, Pencil, Settings, Trash2, X } from 'lucide-react';
 import api from '../api/client';
 import { Asset, AssetCategory, Location } from '../types';
 import { useAuth } from '../contexts/AuthContext';
@@ -23,6 +23,7 @@ export default function AssetsPage() {
   const qc = useQueryClient();
   const [search, setSearch] = useState('');
   const [modal, setModal] = useState<null | { mode: 'create' | 'edit'; asset?: Asset }>(null);
+  const [showCategories, setShowCategories] = useState(false);
 
   const { data: assets, isLoading } = useQuery<Asset[]>({
     queryKey: ['assets', search],
@@ -33,15 +34,27 @@ export default function AssetsPage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold text-gray-900">Assets &amp; Equipment</h1>
-        {hasPermission('ASSET_CREATE') && (
-          <button
-            onClick={() => setModal({ mode: 'create' })}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
-          >
-            <Plus size={16} />
-            Add Asset
-          </button>
-        )}
+        <div className="flex items-center gap-2">
+          {hasPermission('ASSET_CREATE') && (
+            <button
+              onClick={() => setShowCategories(true)}
+              title="Manage categories"
+              className="flex items-center gap-2 px-3 py-2 border border-gray-200 text-gray-600 rounded-lg text-sm hover:bg-gray-50 transition-colors"
+            >
+              <Settings size={15} />
+              Categories
+            </button>
+          )}
+          {hasPermission('ASSET_CREATE') && (
+            <button
+              onClick={() => setModal({ mode: 'create' })}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
+            >
+              <Plus size={16} />
+              Add Asset
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="bg-white border border-gray-200 rounded-xl p-4 flex items-center gap-2">
@@ -110,6 +123,12 @@ export default function AssetsPage() {
           onSuccess={() => { setModal(null); qc.invalidateQueries({ queryKey: ['assets'] }); }}
         />
       )}
+
+      {showCategories && (
+        <CategoryManagerModal
+          onClose={() => setShowCategories(false)}
+        />
+      )}
     </div>
   );
 }
@@ -173,7 +192,7 @@ function AssetModal({ mode, asset, onClose, onSuccess }: { mode: 'create' | 'edi
       <div className="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between p-5 border-b border-gray-100">
           <h2 className="text-base font-semibold">{mode === 'create' ? 'Add Asset' : 'Edit Asset'}</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">✕</button>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
         </div>
         <form onSubmit={handleSubmit} className="p-5 space-y-4">
           {error && <div className="bg-red-50 text-red-700 text-sm px-3 py-2 rounded-lg">{error}</div>}
@@ -198,6 +217,9 @@ function AssetModal({ mode, asset, onClose, onSuccess }: { mode: 'create' | 'edi
                 <option value="">Select category</option>
                 {categories?.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
+              {categories?.length === 0 && (
+                <p className="text-xs text-amber-600 mt-1">No categories yet — use the Categories button to create some.</p>
+              )}
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-700 mb-1">Location *</label>
@@ -238,6 +260,114 @@ function AssetModal({ mode, asset, onClose, onSuccess }: { mode: 'create' | 'edi
             </button>
           </div>
         </form>
+      </div>
+    </div>
+  );
+}
+
+function CategoryManagerModal({ onClose }: { onClose: () => void }) {
+  const { hasPermission } = useAuth();
+  const qc = useQueryClient();
+  const [newName, setNewName] = useState('');
+  const [createError, setCreateError] = useState('');
+
+  const { data: categories, isLoading } = useQuery<AssetCategory[]>({
+    queryKey: ['asset-categories'],
+    queryFn: () => api.get('/assets/categories').then((r) => r.data),
+  });
+
+  const createMutation = useMutation({
+    mutationFn: (name: string) => api.post('/assets/categories', { name }).then((r) => r.data),
+    onSuccess: () => {
+      setNewName('');
+      setCreateError('');
+      qc.invalidateQueries({ queryKey: ['asset-categories'] });
+    },
+    onError: (err: unknown) => {
+      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error;
+      setCreateError(msg || 'Failed to create category');
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => api.delete(`/assets/categories/${id}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['asset-categories'] }),
+    onError: (err: unknown) => {
+      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error;
+      alert(msg || 'Failed to delete category');
+    },
+  });
+
+  const handleCreate = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newName.trim()) return;
+    createMutation.mutate(newName.trim());
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-md max-h-[80vh] flex flex-col">
+        <div className="flex items-center justify-between p-5 border-b border-gray-100 flex-shrink-0">
+          <h2 className="text-base font-semibold">Manage Asset Categories</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto">
+          {isLoading ? (
+            <div className="flex items-center justify-center h-32 text-gray-400 text-sm">Loading...</div>
+          ) : (
+            <ul className="divide-y divide-gray-50">
+              {categories?.map((c) => (
+                <li key={c.id} className="flex items-center justify-between px-5 py-3">
+                  <span className="text-sm text-gray-800">{c.name}</span>
+                  {hasPermission('ASSET_DELETE') && (
+                    <button
+                      onClick={() => {
+                        if (window.confirm(`Delete category "${c.name}"? This will fail if any assets are using it.`)) {
+                          deleteMutation.mutate(c.id);
+                        }
+                      }}
+                      disabled={deleteMutation.isPending}
+                      className="p-1 text-gray-300 hover:text-red-500 transition-colors disabled:opacity-40"
+                      title="Delete category"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  )}
+                </li>
+              ))}
+              {categories?.length === 0 && (
+                <li className="px-5 py-8 text-center text-sm text-gray-400">
+                  No categories yet. Create one below.
+                </li>
+              )}
+            </ul>
+          )}
+        </div>
+
+        {hasPermission('ASSET_CREATE') && (
+          <div className="border-t border-gray-100 p-5 flex-shrink-0">
+            <form onSubmit={handleCreate} className="flex gap-2">
+              <div className="flex-1">
+                <input
+                  type="text"
+                  placeholder="New category name..."
+                  value={newName}
+                  onChange={(e) => { setNewName(e.target.value); setCreateError(''); }}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                {createError && <p className="text-xs text-red-600 mt-1">{createError}</p>}
+              </div>
+              <button
+                type="submit"
+                disabled={!newName.trim() || createMutation.isPending}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium disabled:opacity-50 hover:bg-blue-700 flex-shrink-0"
+              >
+                {createMutation.isPending ? 'Adding...' : 'Add'}
+              </button>
+            </form>
+          </div>
+        )}
       </div>
     </div>
   );

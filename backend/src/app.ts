@@ -53,6 +53,17 @@ app.use('/api/export', exportRouter);
 
 app.get('/api/health', (_req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }));
 
+// In production the compiled backend serves the built React frontend.
+// Static assets are served first; any non-API GET falls back to index.html
+// so that client-side routing works on direct URL navigation.
+if (process.env.NODE_ENV === 'production') {
+  const frontendDist = path.join(__dirname, '../../frontend/dist');
+  app.use(express.static(frontendDist));
+  app.get(/^(?!\/api).*/, (_req, res) => {
+    res.sendFile(path.join(frontendDist, 'index.html'));
+  });
+}
+
 app.use(notFound);
 app.use(errorHandler);
 

@@ -1,3 +1,4 @@
+import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import Layout from './components/Layout';
@@ -9,6 +10,42 @@ import AssetsPage from './pages/Assets';
 import LocationsPage from './pages/Locations';
 import UsersPage from './pages/Users';
 import ReportsPage from './pages/Reports';
+import NotificationSettingsPage from './pages/NotificationSettings';
+
+class ErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { hasError: boolean; message: string }
+> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false, message: '' };
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, message: error.message };
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="flex items-center justify-center h-screen bg-gray-50">
+          <div className="text-center max-w-md px-6">
+            <div className="text-4xl mb-4">⚠️</div>
+            <h1 className="text-xl font-semibold text-gray-900 mb-2">Something went wrong</h1>
+            <p className="text-sm text-gray-500 mb-6">{this.state.message || 'An unexpected error occurred.'}</p>
+            <button
+              onClick={() => { this.setState({ hasError: false, message: '' }); window.location.href = '/'; }}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700"
+            >
+              Return to dashboard
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const { token } = useAuth();
@@ -28,6 +65,7 @@ function AppRoutes() {
         <Route path="locations" element={<LocationsPage />} />
         <Route path="users" element={<UsersPage />} />
         <Route path="reports" element={<ReportsPage />} />
+        <Route path="settings/notifications" element={<NotificationSettingsPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
@@ -36,10 +74,12 @@ function AppRoutes() {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <BrowserRouter>
-        <AppRoutes />
-      </BrowserRouter>
-    </AuthProvider>
+    <ErrorBoundary>
+      <AuthProvider>
+        <BrowserRouter>
+          <AppRoutes />
+        </BrowserRouter>
+      </AuthProvider>
+    </ErrorBoundary>
   );
 }

@@ -104,7 +104,9 @@ async function main() {
     console.log(`  Location: ${loc.name}`);
   }
 
-  const defaultCategories = ['Machinery', 'HVAC', 'Electrical', 'Plumbing', 'Vehicle', 'Safety Equipment', 'IT Equipment', 'Other'];
+  // Minimal neutral categories — administrators should configure categories
+  // that match their facility type during initial setup.
+  const defaultCategories = ['Equipment', 'Other'];
   for (const name of defaultCategories) {
     await prisma.assetCategory.upsert({
       where: { name },

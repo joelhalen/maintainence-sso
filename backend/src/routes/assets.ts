@@ -53,6 +53,44 @@ router.post(
   }
 );
 
+// Category routes must be declared before /:id to prevent Express from
+// matching "categories" as the :id parameter.
+router.get('/categories', requirePermission(Permission.ASSET_READ), async (_req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const categories = await prisma.assetCategory.findMany({ orderBy: { name: 'asc' } });
+    res.json(categories);
+  } catch (e) { next(e); }
+});
+
+router.post(
+  '/categories',
+  requirePermission(Permission.ASSET_CREATE),
+  [body('name').trim().notEmpty().withMessage('Category name is required')],
+  async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) { next(new AppError(400, errors.array()[0].msg as string)); return; }
+    try {
+      const existing = await prisma.assetCategory.findUnique({ where: { name: req.body.name } });
+      if (existing) { next(new AppError(409, 'A category with that name already exists')); return; }
+      const category = await prisma.assetCategory.create({ data: { name: req.body.name } });
+      res.status(201).json(category);
+    } catch (e) { next(e); }
+  }
+);
+
+router.delete(
+  '/categories/:categoryId',
+  requirePermission(Permission.ASSET_DELETE),
+  async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const inUse = await prisma.asset.count({ where: { categoryId: req.params.categoryId, active: true } });
+      if (inUse > 0) { next(new AppError(400, `Cannot delete: ${inUse} active asset(s) use this category`)); return; }
+      await prisma.assetCategory.delete({ where: { id: req.params.categoryId } });
+      res.status(204).send();
+    } catch (e) { next(e); }
+  }
+);
+
 router.get('/:id', requirePermission(Permission.ASSET_READ), async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
     const asset = await prisma.asset.findUnique({
@@ -83,12 +121,5 @@ router.patch(
     } catch (e) { next(e); }
   }
 );
-
-router.get('/categories', requirePermission(Permission.ASSET_READ), async (_req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
-  try {
-    const categories = await prisma.assetCategory.findMany({ orderBy: { name: 'asc' } });
-    res.json(categories);
-  } catch (e) { next(e); }
-});
 
 export default router;
