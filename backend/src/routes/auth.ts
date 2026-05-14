@@ -68,8 +68,14 @@ router.post(
         id: user.id,
         email: user.email,
         name: user.name,
-        role: user.role.name,
-        permissions: user.role.permissions,
+        department: user.department,
+        phone: user.phone,
+        active: user.active,
+        role: {
+          id: user.role.id,
+          name: user.role.name,
+          permissions: user.role.permissions,
+        },
       },
     });
   }
