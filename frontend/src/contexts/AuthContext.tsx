@@ -44,12 +44,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const hasPermission = useCallback(
-    (p: Permission) => auth.user?.role.permissions.includes(p) ?? false,
+    (p: Permission) => auth.user?.role?.permissions?.includes(p) ?? false,
     [auth.user]
   );
 
   const hasAnyPermission = useCallback(
-    (...ps: Permission[]) => ps.some((p) => auth.user?.role.permissions.includes(p) ?? false),
+    (...ps: Permission[]) => ps.some((p) => auth.user?.role?.permissions?.includes(p) ?? false),
     [auth.user]
   );
 
