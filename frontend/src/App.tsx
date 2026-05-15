@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import Layout from './components/Layout';
 import LoginPage from './pages/Login';
+import LandingPage from './pages/Landing';
 import DashboardPage from './pages/Dashboard';
 import TicketsPage from './pages/Tickets';
 import TicketDetailPage from './pages/TicketDetail';
@@ -52,13 +53,19 @@ function PrivateRoute({ children }: { children: React.ReactNode }) {
   return token ? <>{children}</> : <Navigate to="/login" replace />;
 }
 
+/** Renders the analytics dashboard for managers/admins, or the action landing page for everyone else. */
+function HomePage() {
+  const { hasPermission } = useAuth();
+  return hasPermission('REPORT_VIEW') ? <DashboardPage /> : <LandingPage />;
+}
+
 function AppRoutes() {
   const { token } = useAuth();
   return (
     <Routes>
       <Route path="/login" element={token ? <Navigate to="/" replace /> : <LoginPage />} />
       <Route path="/" element={<PrivateRoute><Layout /></PrivateRoute>}>
-        <Route index element={<DashboardPage />} />
+        <Route index element={<HomePage />} />
         <Route path="tickets" element={<TicketsPage />} />
         <Route path="tickets/:id" element={<TicketDetailPage />} />
         <Route path="assets" element={<AssetsPage />} />

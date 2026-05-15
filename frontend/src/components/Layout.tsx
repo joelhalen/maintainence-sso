@@ -6,19 +6,30 @@ import {
 } from 'lucide-react';
 import { useState } from 'react';
 import clsx from 'clsx';
+import { Permission } from '../types';
 
-const NAV_ITEMS = [
-  { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
-  { to: '/tickets', label: 'Tickets', icon: Ticket },
-  { to: '/assets', label: 'Assets', icon: Wrench },
-  { to: '/locations', label: 'Locations', icon: MapPin },
-  { to: '/users', label: 'Users', icon: Users },
-  { to: '/reports', label: 'Reports', icon: BarChart3 },
+interface NavItem {
+  to: string;
+  label: string;
+  icon: React.ElementType;
+  end?: boolean;
+  permission: Permission;
+}
+
+const NAV_ITEMS: NavItem[] = [
+  { to: '/',          label: 'Dashboard', icon: LayoutDashboard, end: true, permission: 'REPORT_VIEW'   },
+  { to: '/tickets',   label: 'Tickets',   icon: Ticket,                     permission: 'TICKET_READ'   },
+  { to: '/assets',    label: 'Assets',    icon: Wrench,                     permission: 'ASSET_READ'    },
+  { to: '/locations', label: 'Locations', icon: MapPin,                     permission: 'LOCATION_READ' },
+  { to: '/users',     label: 'Users',     icon: Users,                      permission: 'USER_READ'     },
+  { to: '/reports',   label: 'Reports',   icon: BarChart3,                  permission: 'REPORT_VIEW'   },
 ];
 
 export default function Layout() {
-  const { user, logout } = useAuth();
+  const { user, logout, hasPermission } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  const visibleNavItems = NAV_ITEMS.filter((item) => hasPermission(item.permission));
 
   return (
     <div className="flex h-screen bg-gray-50 overflow-hidden">
@@ -43,7 +54,7 @@ export default function Layout() {
         </div>
 
         <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-          {NAV_ITEMS.map(({ to, label, icon: Icon, end }) => (
+          {visibleNavItems.map(({ to, label, icon: Icon, end }) => (
             <NavLink
               key={to}
               to={to}
@@ -64,19 +75,21 @@ export default function Layout() {
 
         <div className="border-t border-gray-700 p-4">
           <div className="flex items-center gap-3 mb-3">
-            <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-sm font-bold">
+            <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-sm font-bold flex-shrink-0">
               {user?.name[0]?.toUpperCase()}
             </div>
             <div className="min-w-0">
               <div className="text-sm font-medium text-white truncate">{user?.name}</div>
-              <div className="text-xs text-gray-400 truncate">{user?.role.name}</div>
+              <div className="text-xs text-gray-400 truncate">{user?.role?.name}</div>
             </div>
           </div>
           <NavLink
             to="/settings/notifications"
             onClick={() => setSidebarOpen(false)}
             className={({ isActive }) =>
-              `flex items-center gap-2 w-full px-3 py-2 text-sm rounded-lg transition-colors mb-1 ${isActive ? 'bg-gray-800 text-white' : 'text-gray-400 hover:text-white hover:bg-gray-800'}`
+              `flex items-center gap-2 w-full px-3 py-2 text-sm rounded-lg transition-colors mb-1 ${
+                isActive ? 'bg-gray-800 text-white' : 'text-gray-400 hover:text-white hover:bg-gray-800'
+              }`
             }
           >
             <Bell size={16} />
