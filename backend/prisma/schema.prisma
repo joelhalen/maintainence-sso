@@ -35,6 +35,7 @@ enum Permission {
   ADMIN_PANEL
   AUDIT_LOG_VIEW
   EMAIL_SETTINGS
+  GROUP_MANAGE
 }
 
 enum TicketStatus {
@@ -79,34 +80,55 @@ enum AuditAction {
   SIGN
 }
 
+// Granular rule actions — separate from the coarse role Permission enum so
+// rules can target specific ticket operations at a location / type scope.
+enum RuleAction {
+  VIEW
+  COMMENT
+  UPDATE_STATUS
+  CLOSE
+  ASSIGN
+  CREATE
+  EXPORT
+}
+
+enum RuleEffect {
+  ALLOW
+  DENY
+}
+
 // ─── Users & Auth ─────────────────────────────────────────────────────────────
 
 model User {
-  id            String    @id @default(cuid())
-  email         String    @unique
-  name          String
-  passwordHash  String?
-  ssoId         String?   @unique
-  ssoProvider   String?
-  roleId        String
-  role          Role      @relation(fields: [roleId], references: [id])
-  department    String?
-  phone         String?
-  active        Boolean   @default(true)
-  lastLoginAt   DateTime?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id             String    @id @default(cuid())
+  email          String    @unique
+  name           String
+  passwordHash   String?
+  ssoId          String?   @unique
+  ssoProvider    String?
+  roleId         String
+  role           Role      @relation(fields: [roleId], references: [id])
+  department     String?
+  phone          String?
+  phoneVerified  Boolean   @default(false)
+  active         Boolean   @default(true)
+  lastLoginAt    DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
-  createdTickets    Ticket[]         @relation("TicketCreatedBy")
-  assignedTickets   Ticket[]         @relation("TicketAssignedTo")
-  completedTickets  Ticket[]         @relation("TicketCompletedBy")
-  closedTickets     Ticket[]         @relation("TicketClosedBy")
+  createdTickets    Ticket[]              @relation("TicketCreatedBy")
+  assignedTickets   Ticket[]              @relation("TicketAssignedTo")
+  completedTickets  Ticket[]              @relation("TicketCompletedBy")
+  closedTickets     Ticket[]              @relation("TicketClosedBy")
   comments          TicketComment[]
   statusHistory     TicketStatusHistory[]
   auditLogs         AuditLog[]
   notificationPref  NotificationPreference?
   signatures        ElectronicSignature[]
   deviceTokens      DeviceToken[]
+  groupMemberships  GroupMembership[]
+  permissionRules   PermissionRule[]
+  phoneVerification PhoneVerification?
 
   @@index([email])
   @@index([roleId])
@@ -121,6 +143,71 @@ model Role {
   isSystem    Boolean      @default(false)
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
+}
+
+// ─── User Groups ──────────────────────────────────────────────────────────────
+
+model Group {
+  id          String            @id @default(cuid())
+  name        String            @unique
+  description String?
+  color       String?           // hex colour for UI badge
+  members     GroupMembership[]
+  rules       PermissionRule[]
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+}
+
+model GroupMembership {
+  id      String   @id @default(cuid())
+  userId  String
+  groupId String
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  group   Group    @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  addedAt DateTime @default(now())
+
+  @@unique([userId, groupId])
+  @@index([userId])
+  @@index([groupId])
+}
+
+// ─── Granular Permission Rules ────────────────────────────────────────────────
+// A rule targets either a User OR a Group (exactly one must be set).
+// Scope is optionally narrowed to a specific Location and/or TicketType.
+// null scope means "applies everywhere / all types".
+// DENY takes precedence over ALLOW when rules conflict.
+
+model PermissionRule {
+  id         String      @id @default(cuid())
+  userId     String?
+  groupId    String?
+  locationId String?
+  ticketType TicketType?
+  action     RuleAction
+  effect     RuleEffect  @default(ALLOW)
+
+  user     User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  group    Group?    @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  location Location? @relation(fields: [locationId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([groupId])
+  @@index([locationId])
+}
+
+// ─── Phone / SMS Verification ─────────────────────────────────────────────────
+
+model PhoneVerification {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  phone     String
+  codeHash  String
+  expiresAt DateTime
+  attempts  Int      @default(0)
+  createdAt DateTime @default(now())
 }
 
 // ─── Locations ────────────────────────────────────────────────────────────────
@@ -139,6 +226,8 @@ model Location {
   active      Boolean    @default(true)
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
+
+  permissionRules PermissionRule[]
 
   @@index([parentId])
 }
@@ -201,23 +290,23 @@ model Ticket {
   closedById    String?
   closedBy      User?          @relation("TicketClosedBy", fields: [closedById], references: [id])
 
-  dueDate          DateTime?
-  startedAt        DateTime?
-  completedAt      DateTime?
-  closedAt         DateTime?
-  estimatedHours   Decimal?      @db.Decimal(8, 2)
-  actualHours      Decimal?      @db.Decimal(8, 2)
-  resolutionNotes  String?
-  tags             String[]
+  dueDate         DateTime?
+  startedAt       DateTime?
+  completedAt     DateTime?
+  closedAt        DateTime?
+  estimatedHours  Decimal?      @db.Decimal(8, 2)
+  actualHours     Decimal?      @db.Decimal(8, 2)
+  resolutionNotes String?
+  tags            String[]
 
-  comments         TicketComment[]
-  attachments      Attachment[]
-  statusHistory    TicketStatusHistory[]
-  emailLogs        EmailLog[]
-  signatures       ElectronicSignature[]
+  comments      TicketComment[]
+  attachments   Attachment[]
+  statusHistory TicketStatusHistory[]
+  emailLogs     EmailLog[]
+  signatures    ElectronicSignature[]
 
-  createdAt        DateTime       @default(now())
-  updatedAt        DateTime       @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([status])
   @@index([priority])
@@ -228,16 +317,16 @@ model Ticket {
 }
 
 model TicketComment {
-  id         String   @id @default(cuid())
+  id         String    @id @default(cuid())
   ticketId   String
-  ticket     Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  ticket     Ticket    @relation(fields: [ticketId], references: [id], onDelete: Cascade)
   authorId   String
-  author     User     @relation(fields: [authorId], references: [id])
+  author     User      @relation(fields: [authorId], references: [id])
   content    String
-  isInternal Boolean  @default(false)
+  isInternal Boolean   @default(false)
   editedAt   DateTime?
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
 
   @@index([ticketId])
 }
@@ -309,10 +398,10 @@ model AuditLog {
   @@index([action])
 }
 
-// ─── Email Logs ───────────────────────────────────────────────────────────────
+// ─── Email / SMS Logs ─────────────────────────────────────────────────────────
 
 model EmailLog {
-  id           String   @id @default(cuid())
+  id           String    @id @default(cuid())
   to           String[]
   cc           String[]
   subject      String
@@ -320,13 +409,32 @@ model EmailLog {
   status       String
   errorMessage String?
   ticketId     String?
-  ticket       Ticket?  @relation(fields: [ticketId], references: [id])
+  ticket       Ticket?   @relation(fields: [ticketId], references: [id])
   messageId    String?
   sentAt       DateTime?
-  createdAt    DateTime @default(now())
+  createdAt    DateTime  @default(now())
 
   @@index([ticketId])
   @@index([status])
+}
+
+model SmsLog {
+  id           String    @id @default(cuid())
+  to           String
+  body         String
+  templateName String?
+  status       String    // PENDING | SENT | FAILED
+  errorMessage String?
+  provider     String?
+  messageId    String?
+  ticketId     String?
+  userId       String?
+  sentAt       DateTime?
+  createdAt    DateTime  @default(now())
+
+  @@index([to])
+  @@index([status])
+  @@index([ticketId])
 }
 
 // ─── Notification Preferences ─────────────────────────────────────────────────
@@ -335,11 +443,17 @@ model NotificationPreference {
   id              String  @id @default(cuid())
   userId          String  @unique
   user            User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // Email
+  emailEnabled    Boolean @default(true)
   onAssign        Boolean @default(true)
   onComment       Boolean @default(true)
   onStatusChange  Boolean @default(true)
   onDueDateRemind Boolean @default(true)
-  emailEnabled    Boolean @default(true)
+  // SMS
+  smsEnabled      Boolean @default(false)
+  onAssignSms     Boolean @default(false)
+  onStatusSms     Boolean @default(false)
+  onCommentSms    Boolean @default(false)
 }
 
 // ─── Mobile Push Notification Device Tokens ────────────────────────────────────

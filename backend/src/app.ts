@@ -16,6 +16,9 @@ import devicesRouter from './routes/devices';
 import attachmentsRouter from './routes/attachments';
 import signaturesRouter from './routes/signatures';
 import exportRouter from './routes/export';
+import groupsRouter from './routes/groups';
+import permissionRulesRouter from './routes/permissionRules';
+import phoneRouter from './routes/phone';
 import { errorHandler, notFound } from './middleware/errorHandler';
 import { logger } from './config/logger';
 
@@ -50,6 +53,9 @@ app.use('/api/devices', devicesRouter);
 app.use('/api/attachments', attachmentsRouter);
 app.use('/api/signatures', signaturesRouter);
 app.use('/api/export', exportRouter);
+app.use('/api/groups', groupsRouter);
+app.use('/api/permission-rules', permissionRulesRouter);
+app.use('/api/phone', phoneRouter);
 
 app.get('/api/health', (_req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }));
 

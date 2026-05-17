@@ -1,6 +1,8 @@
 import { TicketStatus, TicketPriority, TicketType, AuditAction } from '@prisma/client';
 import prisma from '../config/database';
 import { sendEmail, ticketCreatedTemplate, ticketAssignedTemplate, ticketStatusChangedTemplate } from './emailService';
+import { sendTicketSmsNotification } from './smsService';
+import { getTicketVisibilityFilter } from './permissionService';
 import { writeAudit } from './auditService';
 import { AppError } from '../middleware/errorHandler';
 import { AuthUser, TicketFilterQuery, PaginatedResult } from '../types';
@@ -24,13 +26,19 @@ export async function listTickets(
   const limit = Math.min(100, Math.max(1, parseInt(filters.limit || '25')));
   const skip = (page - 1) * limit;
 
-  const where: Record<string, unknown> = {};
+  // Apply location-scoped visibility rules for non-admin users
+  const visibilityFilter = await getTicketVisibilityFilter(user.id, user.permissions);
+  const where: Record<string, unknown> = { ...visibilityFilter };
+
   if (filters.status) where.status = filters.status;
   if (filters.priority) where.priority = filters.priority;
   if (filters.type) where.type = filters.type;
   if (filters.locationId) where.locationId = filters.locationId;
   if (filters.assetId) where.assetId = filters.assetId;
-  if (filters.assignedToId) where.assignedToId = filters.assignedToId;
+  // Support the literal value "me" to mean "the current user"
+  if (filters.assignedToId) {
+    where.assignedToId = filters.assignedToId === 'me' ? user.id : filters.assignedToId;
+  }
   if (filters.from || filters.to) {
     where.createdAt = {};
     if (filters.from) (where.createdAt as Record<string, unknown>).gte = new Date(filters.from);
@@ -135,6 +143,12 @@ export async function createTicket(
       ticketId: ticket.id,
       templateName: 'ticket_assigned',
     }).catch(() => {});
+
+    sendTicketSmsNotification(ticket.assignedTo.id, 'assign', {
+      ticketNumber: ticket.ticketNumber,
+      title: ticket.title,
+      url: ticketUrl,
+    }).catch(() => {});
   }
 
   return ticket;
@@ -214,6 +228,13 @@ export async function updateTicketStatus(
       }),
       ticketId: ticket.id,
       templateName: 'ticket_status_changed',
+    }).catch(() => {});
+
+    sendTicketSmsNotification(u.id, 'status', {
+      ticketNumber: ticket.ticketNumber,
+      title: ticket.title,
+      url: ticketUrl,
+      detail: newStatus.replace(/_/g, ' '),
     }).catch(() => {});
   }
 
