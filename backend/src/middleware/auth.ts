@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken';
 import { AuthRequest, AuthUser, JwtPayload } from '../types';
 import prisma from '../config/database';
 import { AppError } from './errorHandler';
+import { toOrganizationContext } from '../services/entitlementService';
 
 export const authenticate = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   const header = req.headers.authorization;
@@ -17,10 +18,13 @@ export const authenticate = async (req: AuthRequest, res: Response, next: NextFu
 
     const user = await prisma.user.findUnique({
       where: { id: payload.sub, active: true },
-      include: { role: true },
+      include: {
+        role: true,
+        organization: { include: { subscription: { include: { plan: true } } } },
+      },
     });
 
-    if (!user) {
+    if (!user || !user.organization?.active) {
       next(new AppError(401, 'User not found or inactive'));
       return;
     }
@@ -32,6 +36,8 @@ export const authenticate = async (req: AuthRequest, res: Response, next: NextFu
       roleId: user.roleId,
       roleName: user.role.name,
       permissions: user.role.permissions,
+      organizationId: user.organizationId,
+      organization: toOrganizationContext(user.organization),
     } as AuthUser;
 
     req.auditMeta = {

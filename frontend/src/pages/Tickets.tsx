@@ -3,10 +3,11 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { Plus, Search } from 'lucide-react';
 import api from '../api/client';
-import { Ticket, TicketStatus, TicketPriority, PaginatedResult } from '../types';
+import { Ticket, TicketStatus, TicketPriority, PaginatedResult, OrganizationSubscriptionResponse } from '../types';
 import StatusBadge from '../components/StatusBadge';
 import CreateTicketModal from '../components/CreateTicketModal';
 import { useAuth } from '../contexts/AuthContext';
+import { isLimitReached, limitMessage } from '../components/SubscriptionUsage';
 import { format } from 'date-fns';
 
 const STATUSES: TicketStatus[] = ['OPEN', 'IN_PROGRESS', 'ON_HOLD', 'PENDING_PARTS', 'PENDING_REVIEW', 'COMPLETED', 'CLOSED', 'CANCELLED'];
@@ -26,6 +27,12 @@ export default function TicketsPage() {
     queryFn: () => api.get('/tickets', { params: { search, status, priority, page, limit: 25 } }).then((r) => r.data),
     placeholderData: (prev) => prev,
   });
+  const { data: subscription } = useQuery<OrganizationSubscriptionResponse>({
+    queryKey: ['organization-me'],
+    queryFn: () => api.get('/organizations/me').then((r) => r.data),
+  });
+
+  const activeTicketLimitReached = isLimitReached(subscription?.organization, subscription?.usage, 'activeTickets');
 
   return (
     <div className="space-y-4">
@@ -34,13 +41,20 @@ export default function TicketsPage() {
         {hasPermission('TICKET_CREATE') && (
           <button
             onClick={() => setShowCreate(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
+            disabled={activeTicketLimitReached}
+            title={activeTicketLimitReached && subscription ? limitMessage(subscription.organization, 'activeTickets') : undefined}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Plus size={16} />
             New Ticket
           </button>
         )}
       </div>
+      {activeTicketLimitReached && subscription && (
+        <div className="bg-amber-50 text-amber-800 text-sm px-4 py-3 rounded-lg">
+          {limitMessage(subscription.organization, 'activeTickets')} Close tickets or upgrade to create more.
+        </div>
+      )}
 
       {/* Filters */}
       <div className="bg-white border border-gray-200 rounded-xl p-4 flex flex-wrap gap-3">
@@ -137,7 +151,11 @@ export default function TicketsPage() {
       {showCreate && (
         <CreateTicketModal
           onClose={() => setShowCreate(false)}
-          onSuccess={() => { setShowCreate(false); qc.invalidateQueries({ queryKey: ['tickets'] }); }}
+          onSuccess={() => {
+            setShowCreate(false);
+            qc.invalidateQueries({ queryKey: ['tickets'] });
+            qc.invalidateQueries({ queryKey: ['organization-me'] });
+          }}
         />
       )}
     </div>

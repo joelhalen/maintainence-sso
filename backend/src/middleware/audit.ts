@@ -1,5 +1,5 @@
 import { Response, NextFunction } from 'express';
-import { AuditAction } from '@prisma/client';
+import { AuditAction, Prisma } from '@prisma/client';
 import { AuthRequest } from '../types';
 import prisma from '../config/database';
 import { auditLogger } from '../config/logger';
@@ -16,7 +16,7 @@ export const auditMiddleware = (resource: string, action: AuditAction) =>
             action,
             resource,
             resourceId,
-            newValues: action !== AuditAction.DELETE ? (body as Record<string, unknown>) : undefined,
+            newValues: action !== AuditAction.DELETE ? (body as Prisma.InputJsonValue) : undefined,
             ipAddress: req.auditMeta?.ipAddress,
             userAgent: req.auditMeta?.userAgent,
           },

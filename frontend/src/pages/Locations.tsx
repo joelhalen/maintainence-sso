@@ -2,8 +2,9 @@ import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { MapPin, Plus, ChevronRight, Pencil } from 'lucide-react';
 import api from '../api/client';
-import { Location } from '../types';
+import { Location, OrganizationSubscriptionResponse } from '../types';
 import { useAuth } from '../contexts/AuthContext';
+import { isLimitReached, limitMessage } from '../components/SubscriptionUsage';
 
 interface LocationFormData {
   name: string;
@@ -22,6 +23,12 @@ export default function LocationsPage() {
     queryKey: ['locations'],
     queryFn: () => api.get('/locations').then((r) => r.data),
   });
+  const { data: subscription } = useQuery<OrganizationSubscriptionResponse>({
+    queryKey: ['organization-me'],
+    queryFn: () => api.get('/organizations/me').then((r) => r.data),
+  });
+
+  const locationLimitReached = isLimitReached(subscription?.organization, subscription?.usage, 'locations');
 
   return (
     <div className="space-y-4">
@@ -30,13 +37,20 @@ export default function LocationsPage() {
         {hasPermission('LOCATION_CREATE') && (
           <button
             onClick={() => setModal({ mode: 'create' })}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
+            disabled={locationLimitReached}
+            title={locationLimitReached && subscription ? limitMessage(subscription.organization, 'locations') : undefined}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Plus size={16} />
             Add Location
           </button>
         )}
       </div>
+      {locationLimitReached && subscription && (
+        <div className="bg-amber-50 text-amber-800 text-sm px-4 py-3 rounded-lg">
+          {limitMessage(subscription.organization, 'locations')} Upgrade to add more locations.
+        </div>
+      )}
 
       <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
         {isLoading ? (
@@ -94,7 +108,11 @@ export default function LocationsPage() {
           location={modal.location}
           allLocations={locations ?? []}
           onClose={() => setModal(null)}
-          onSuccess={() => { setModal(null); qc.invalidateQueries({ queryKey: ['locations'] }); }}
+          onSuccess={() => {
+            setModal(null);
+            qc.invalidateQueries({ queryKey: ['locations'] });
+            qc.invalidateQueries({ queryKey: ['organization-me'] });
+          }}
         />
       )}
     </div>

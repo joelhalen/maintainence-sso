@@ -13,9 +13,6 @@ build/
 .env.local
 .env.*.local
 
-# Prisma
-backend/prisma/migrations/
-
 # Logs
 logs/
 *.log
@@ -34,3 +31,5 @@ backend/uploads/
 
 # Test output
 coverage/
+
+LOCAL_README.md

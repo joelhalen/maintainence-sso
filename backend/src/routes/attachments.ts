@@ -51,7 +51,9 @@ router.post(
       return;
     }
     try {
-      const ticket = await prisma.ticket.findUnique({ where: { id: req.params.ticketId } });
+      const ticket = await prisma.ticket.findFirst({
+        where: { id: req.params.ticketId, organizationId: req.user!.organizationId },
+      });
       if (!ticket) {
         next(new AppError(404, 'Ticket not found'));
         return;
@@ -59,6 +61,7 @@ router.post(
 
       const attachment = await prisma.attachment.create({
         data: {
+          organizationId: req.user!.organizationId,
           ticketId: req.params.ticketId,
           filename: req.file.filename,
           originalName: req.file.originalname,
@@ -80,7 +83,15 @@ router.delete(
   requirePermission(Permission.TICKET_UPDATE),
   async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
     try {
-      await prisma.attachment.delete({ where: { id: req.params.id } });
+      const attachment = await prisma.attachment.findFirst({
+        where: { id: req.params.id, organizationId: req.user!.organizationId },
+      });
+      if (!attachment) {
+        next(new AppError(404, 'Attachment not found'));
+        return;
+      }
+
+      await prisma.attachment.delete({ where: { id: attachment.id } });
       res.status(204).send();
     } catch (e) {
       next(e);

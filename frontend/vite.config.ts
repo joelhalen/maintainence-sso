@@ -6,6 +6,7 @@ export default defineConfig({
   server: {
     port: 5173,
     host: true,
+    allowedHosts: ['megamtx.joelhalen.net', 'localhost'],
     proxy: {
       '/api': {
         target: 'http://localhost:4000',

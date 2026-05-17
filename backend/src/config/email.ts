@@ -26,3 +26,25 @@ export const createTransport = () => {
 };
 
 export const emailTransport = createTransport();
+
+export function getEmailConfigStatus() {
+  return {
+    smtpHost: Boolean(process.env.SMTP_HOST),
+    smtpPort: Boolean(process.env.SMTP_PORT),
+    smtpSecure: process.env.SMTP_SECURE === 'true',
+    smtpUser: Boolean(process.env.SMTP_USER),
+    smtpPass: Boolean(process.env.SMTP_PASS),
+    emailFromName: Boolean(process.env.EMAIL_FROM_NAME),
+    emailFromAddress: Boolean(process.env.EMAIL_FROM_ADDRESS),
+    frontendUrl: Boolean(process.env.FRONTEND_URL),
+    replyDomain: Boolean(process.env.EMAIL_REPLY_DOMAIN),
+    replyLocalPart: Boolean(process.env.EMAIL_REPLY_LOCAL_PART),
+  };
+}
+
+export function getTicketReplyTo(ticketNumber: string): string | undefined {
+  const domain = process.env.EMAIL_REPLY_DOMAIN;
+  const localPart = process.env.EMAIL_REPLY_LOCAL_PART || 'maintenance';
+  if (!domain) return undefined;
+  return `${localPart}+ticket-${ticketNumber}@${domain}`;
+}

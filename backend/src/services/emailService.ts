@@ -11,6 +11,7 @@ export async function sendEmail(options: EmailOptions): Promise<boolean> {
 
   const log = await prisma.emailLog.create({
     data: {
+      organizationId: options.organizationId,
       to: toArray,
       cc: ccArray,
       subject: options.subject,
@@ -25,15 +26,37 @@ export async function sendEmail(options: EmailOptions): Promise<boolean> {
       from: FROM,
       to: toArray.join(', '),
       cc: ccArray.join(', ') || undefined,
+      replyTo: options.replyTo,
       subject: options.subject,
       html: options.html,
       text: options.text || htmlToText(options.html),
+      headers: options.headers,
     });
 
     await prisma.emailLog.update({
       where: { id: log.id },
       data: { status: 'SENT', messageId: result.messageId, sentAt: new Date() },
     });
+
+    if (options.organizationId) {
+      await prisma.emailMessage.create({
+        data: {
+          organizationId: options.organizationId,
+          direction: 'OUTBOUND',
+          provider: 'smtp',
+          messageId: result.messageId,
+          from: process.env.EMAIL_FROM_ADDRESS || '',
+          to: toArray,
+          cc: ccArray,
+          subject: options.subject,
+          textBody: options.text || htmlToText(options.html),
+          htmlBody: options.html,
+          status: 'PROCESSED',
+          sentAt: new Date(),
+          ticketId: options.ticketId,
+        },
+      }).catch((error) => logger.warn('Failed to store outbound email message', { error, messageId: result.messageId }));
+    }
     return true;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

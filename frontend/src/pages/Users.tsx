@@ -3,6 +3,8 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Plus, Pencil } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import api from '../api/client';
+import { OrganizationSubscriptionResponse } from '../types';
+import { isLimitReached, limitMessage } from '../components/SubscriptionUsage';
 
 interface Role {
   id: string;
@@ -41,6 +43,13 @@ export default function UsersPage() {
     queryFn: () => api.get('/users').then((r) => r.data),
     enabled: hasPermission('USER_READ'),
   });
+  const { data: subscription } = useQuery<OrganizationSubscriptionResponse>({
+    queryKey: ['organization-me'],
+    queryFn: () => api.get('/organizations/me').then((r) => r.data),
+    enabled: hasPermission('USER_READ'),
+  });
+
+  const userLimitReached = isLimitReached(subscription?.organization, subscription?.usage, 'activeUsers');
 
   if (!hasPermission('USER_READ')) {
     return <div className="text-center py-12 text-gray-400">You don't have permission to view users.</div>;
@@ -53,13 +62,20 @@ export default function UsersPage() {
         {hasPermission('USER_CREATE') && (
           <button
             onClick={() => setModal({ mode: 'create' })}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
+            disabled={userLimitReached}
+            title={userLimitReached && subscription ? limitMessage(subscription.organization, 'activeUsers') : undefined}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Plus size={16} />
             Add User
           </button>
         )}
       </div>
+      {userLimitReached && subscription && (
+        <div className="bg-amber-50 text-amber-800 text-sm px-4 py-3 rounded-lg">
+          {limitMessage(subscription.organization, 'activeUsers')} Upgrade to add more users.
+        </div>
+      )}
 
       <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
         {isLoading ? (
@@ -116,7 +132,11 @@ export default function UsersPage() {
           mode={modal.mode}
           user={modal.user}
           onClose={() => setModal(null)}
-          onSuccess={() => { setModal(null); qc.invalidateQueries({ queryKey: ['users'] }); }}
+          onSuccess={() => {
+            setModal(null);
+            qc.invalidateQueries({ queryKey: ['users'] });
+            qc.invalidateQueries({ queryKey: ['organization-me'] });
+          }}
         />
       )}
     </div>
@@ -201,7 +221,7 @@ function UserModal({ mode, user, onClose, onSuccess }: { mode: 'create' | 'edit'
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-700 mb-1">Phone</label>
-              <input type="tel" value={form.phone} onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              <input type="tel" placeholder="+15558675310" value={form.phone} onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
             </div>
           </div>
           <div>

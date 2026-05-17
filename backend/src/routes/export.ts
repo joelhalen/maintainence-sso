@@ -4,6 +4,7 @@ import { AuthRequest } from '../types';
 import { authenticate } from '../middleware/auth';
 import { requirePermission } from '../middleware/rbac';
 import prisma from '../config/database';
+import { AppError } from '../middleware/errorHandler';
 
 const router = Router();
 router.use(authenticate, requirePermission(Permission.TICKET_EXPORT));
@@ -24,7 +25,12 @@ router.get(
   '/tickets',
   async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const where: Record<string, unknown> = {};
+      if (!req.user!.organization.subscription.plan.limits.allowExports) {
+        next(new AppError(402, 'Ticket export is not included in the current subscription plan'));
+        return;
+      }
+
+      const where: Record<string, unknown> = { organizationId: req.user!.organizationId };
       if (req.query.status) where.status = req.query.status;
       if (req.query.priority) where.priority = req.query.priority;
       if (req.query.locationId) where.locationId = req.query.locationId;

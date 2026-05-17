@@ -16,6 +16,9 @@ import devicesRouter from './routes/devices';
 import attachmentsRouter from './routes/attachments';
 import signaturesRouter from './routes/signatures';
 import exportRouter from './routes/export';
+import webhooksRouter from './routes/webhooks';
+import organizationsRouter from './routes/organizations';
+import adminEmailRouter from './routes/adminEmail';
 import { errorHandler, notFound } from './middleware/errorHandler';
 import { logger } from './config/logger';
 
@@ -50,6 +53,9 @@ app.use('/api/devices', devicesRouter);
 app.use('/api/attachments', attachmentsRouter);
 app.use('/api/signatures', signaturesRouter);
 app.use('/api/export', exportRouter);
+app.use('/api/webhooks', webhooksRouter);
+app.use('/api/organizations', organizationsRouter);
+app.use('/api/admin/email', adminEmailRouter);
 
 app.get('/api/health', (_req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }));
 

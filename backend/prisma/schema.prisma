@@ -79,99 +79,224 @@ enum AuditAction {
   SIGN
 }
 
+enum EmailDirection {
+  INBOUND
+  OUTBOUND
+}
+
+enum EmailMessageStatus {
+  RECEIVED
+  PROCESSED
+  IGNORED
+  FAILED
+}
+
+enum SubscriptionTier {
+  FREE
+  STARTER
+  PROFESSIONAL
+  ENTERPRISE
+}
+
+enum SubscriptionStatus {
+  TRIALING
+  ACTIVE
+  PAST_DUE
+  CANCELED
+  EXPIRED
+}
+
+// ─── Organizations & Subscriptions ────────────────────────────────────────────
+
+model Organization {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users            User[]
+  roles            Role[]
+  locations        Location[]
+  assetCategories  AssetCategory[]
+  assets           Asset[]
+  tickets          Ticket[]
+  comments         TicketComment[]
+  statusHistory    TicketStatusHistory[]
+  attachments      Attachment[]
+  signatures       ElectronicSignature[]
+  auditLogs        AuditLog[]
+  emailLogs        EmailLog[]
+  emailMessages    EmailMessage[]
+  emailAttachments EmailAttachment[]
+  smsLogs          SmsLog[]
+  deviceTokens     DeviceToken[]
+  subscription     OrganizationSubscription?
+
+  @@index([slug])
+}
+
+model SubscriptionPlan {
+  id                String           @id @default(cuid())
+  tier              SubscriptionTier @unique
+  name              String
+  description       String?
+  monthlyPriceCents Int?
+  maxActiveUsers    Int?
+  maxLocations      Int?
+  maxAssets         Int?
+  maxActiveTickets  Int?
+  allowSms          Boolean          @default(false)
+  allowSso          Boolean          @default(false)
+  allowExports      Boolean          @default(false)
+  paypalPlanId      String?          @unique
+  active            Boolean          @default(true)
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+
+  subscriptions OrganizationSubscription[]
+}
+
+model OrganizationSubscription {
+  id                   String             @id @default(cuid())
+  organizationId       String             @unique
+  organization         Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  planId               String
+  plan                 SubscriptionPlan   @relation(fields: [planId], references: [id])
+  status               SubscriptionStatus @default(ACTIVE)
+  provider             String             @default("paypal")
+  providerCustomerId   String?
+  paypalSubscriptionId String?            @unique
+  currentPeriodStart   DateTime?
+  currentPeriodEnd     DateTime?
+  trialEndsAt          DateTime?
+  cancelAtPeriodEnd    Boolean            @default(false)
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+
+  @@index([planId])
+  @@index([status])
+}
+
 // ─── Users & Auth ─────────────────────────────────────────────────────────────
 
 model User {
-  id            String    @id @default(cuid())
-  email         String    @unique
-  name          String
-  passwordHash  String?
-  ssoId         String?   @unique
-  ssoProvider   String?
-  roleId        String
-  role          Role      @relation(fields: [roleId], references: [id])
-  department    String?
-  phone         String?
-  active        Boolean   @default(true)
-  lastLoginAt   DateTime?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id              String       @id @default(cuid())
+  email           String       @unique
+  name            String
+  passwordHash    String?
+  ssoId           String?      @unique
+  ssoProvider     String?
+  roleId          String
+  role            Role         @relation(fields: [roleId], references: [id])
+  organizationId  String
+  organization    Organization @relation(fields: [organizationId], references: [id])
+  department      String?
+  phone           String?
+  phoneVerifiedAt DateTime?
+  active          Boolean      @default(true)
+  lastLoginAt     DateTime?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
 
-  createdTickets    Ticket[]         @relation("TicketCreatedBy")
-  assignedTickets   Ticket[]         @relation("TicketAssignedTo")
-  completedTickets  Ticket[]         @relation("TicketCompletedBy")
-  closedTickets     Ticket[]         @relation("TicketClosedBy")
-  comments          TicketComment[]
-  statusHistory     TicketStatusHistory[]
-  auditLogs         AuditLog[]
-  notificationPref  NotificationPreference?
-  signatures        ElectronicSignature[]
-  deviceTokens      DeviceToken[]
+  createdTickets   Ticket[]                @relation("TicketCreatedBy")
+  assignedTickets  Ticket[]                @relation("TicketAssignedTo")
+  completedTickets Ticket[]                @relation("TicketCompletedBy")
+  closedTickets    Ticket[]                @relation("TicketClosedBy")
+  comments         TicketComment[]
+  statusHistory    TicketStatusHistory[]
+  auditLogs        AuditLog[]
+  notificationPref NotificationPreference?
+  signatures       ElectronicSignature[]
+  deviceTokens     DeviceToken[]
+  smsLogs          SmsLog[]
+  emailMessages    EmailMessage[]
 
   @@index([email])
   @@index([roleId])
+  @@index([organizationId])
 }
 
 model Role {
-  id          String       @id @default(cuid())
-  name        String       @unique
-  description String?
-  permissions Permission[]
-  users       User[]
-  isSystem    Boolean      @default(false)
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  name           String
+  description    String?
+  permissions    Permission[]
+  users          User[]
+  isSystem       Boolean      @default(false)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
 }
 
 // ─── Locations ────────────────────────────────────────────────────────────────
 
 model Location {
-  id          String     @id @default(cuid())
-  name        String
-  code        String?    @unique
-  description String?
-  address     String?
-  parentId    String?
-  parent      Location?  @relation("LocationHierarchy", fields: [parentId], references: [id])
-  children    Location[] @relation("LocationHierarchy")
-  assets      Asset[]
-  tickets     Ticket[]
-  active      Boolean    @default(true)
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  name           String
+  code           String?
+  description    String?
+  address        String?
+  parentId       String?
+  parent         Location?    @relation("LocationHierarchy", fields: [parentId], references: [id])
+  children       Location[]   @relation("LocationHierarchy")
+  assets         Asset[]
+  tickets        Ticket[]
+  active         Boolean      @default(true)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
 
+  @@unique([organizationId, code])
+  @@index([organizationId])
   @@index([parentId])
 }
 
 // ─── Assets / Equipment ───────────────────────────────────────────────────────
 
 model AssetCategory {
-  id     String  @id @default(cuid())
-  name   String  @unique
-  assets Asset[]
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  name           String
+  assets         Asset[]
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
 }
 
 model Asset {
-  id            String        @id @default(cuid())
-  name          String
-  assetTag      String?       @unique
-  serialNumber  String?
-  model         String?
-  manufacturer  String?
-  categoryId    String
-  category      AssetCategory @relation(fields: [categoryId], references: [id])
-  locationId    String
-  location      Location      @relation(fields: [locationId], references: [id])
-  description   String?
-  installDate   DateTime?
-  warrantyExp   DateTime?
-  qrCode        String?       @unique
+  id             String        @id @default(cuid())
+  organizationId String
+  organization   Organization  @relation(fields: [organizationId], references: [id])
+  name           String
+  assetTag       String?
+  serialNumber   String?
+  model          String?
+  manufacturer   String?
+  categoryId     String
+  category       AssetCategory @relation(fields: [categoryId], references: [id])
+  locationId     String
+  location       Location      @relation(fields: [locationId], references: [id])
+  description    String?
+  installDate    DateTime?
+  warrantyExp    DateTime?
+  qrCode         String?
   specifications Json?
-  active        Boolean       @default(true)
-  tickets       Ticket[]
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
+  active         Boolean       @default(true)
+  tickets        Ticket[]
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
 
+  @@unique([organizationId, assetTag])
+  @@unique([organizationId, qrCode])
+  @@index([organizationId])
   @@index([locationId])
   @@index([categoryId])
 }
@@ -179,46 +304,51 @@ model Asset {
 // ─── Tickets ──────────────────────────────────────────────────────────────────
 
 model Ticket {
-  id            String         @id @default(cuid())
-  ticketNumber  String         @unique
-  title         String
-  description   String
-  type          TicketType     @default(CORRECTIVE)
-  status        TicketStatus   @default(OPEN)
-  priority      TicketPriority @default(MEDIUM)
+  id             String         @id @default(cuid())
+  organizationId String
+  organization   Organization   @relation(fields: [organizationId], references: [id])
+  ticketNumber   String         @unique
+  title          String
+  description    String
+  type           TicketType     @default(CORRECTIVE)
+  status         TicketStatus   @default(OPEN)
+  priority       TicketPriority @default(MEDIUM)
 
-  locationId    String
-  location      Location       @relation(fields: [locationId], references: [id])
-  assetId       String?
-  asset         Asset?         @relation(fields: [assetId], references: [id])
+  locationId String
+  location   Location @relation(fields: [locationId], references: [id])
+  assetId    String?
+  asset      Asset?   @relation(fields: [assetId], references: [id])
 
   createdById   String
-  createdBy     User           @relation("TicketCreatedBy", fields: [createdById], references: [id])
+  createdBy     User    @relation("TicketCreatedBy", fields: [createdById], references: [id])
   assignedToId  String?
-  assignedTo    User?          @relation("TicketAssignedTo", fields: [assignedToId], references: [id])
+  assignedTo    User?   @relation("TicketAssignedTo", fields: [assignedToId], references: [id])
   completedById String?
-  completedBy   User?          @relation("TicketCompletedBy", fields: [completedById], references: [id])
+  completedBy   User?   @relation("TicketCompletedBy", fields: [completedById], references: [id])
   closedById    String?
-  closedBy      User?          @relation("TicketClosedBy", fields: [closedById], references: [id])
+  closedBy      User?   @relation("TicketClosedBy", fields: [closedById], references: [id])
 
-  dueDate          DateTime?
-  startedAt        DateTime?
-  completedAt      DateTime?
-  closedAt         DateTime?
-  estimatedHours   Decimal?      @db.Decimal(8, 2)
-  actualHours      Decimal?      @db.Decimal(8, 2)
-  resolutionNotes  String?
-  tags             String[]
+  dueDate         DateTime?
+  startedAt       DateTime?
+  completedAt     DateTime?
+  closedAt        DateTime?
+  estimatedHours  Decimal?  @db.Decimal(8, 2)
+  actualHours     Decimal?  @db.Decimal(8, 2)
+  resolutionNotes String?
+  tags            String[]
 
-  comments         TicketComment[]
-  attachments      Attachment[]
-  statusHistory    TicketStatusHistory[]
-  emailLogs        EmailLog[]
-  signatures       ElectronicSignature[]
+  comments      TicketComment[]
+  attachments   Attachment[]
+  statusHistory TicketStatusHistory[]
+  emailLogs     EmailLog[]
+  emailMessages EmailMessage[]
+  smsLogs       SmsLog[]
+  signatures    ElectronicSignature[]
 
-  createdAt        DateTime       @default(now())
-  updatedAt        DateTime       @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
+  @@index([organizationId])
   @@index([status])
   @@index([priority])
   @@index([locationId])
@@ -228,81 +358,96 @@ model Ticket {
 }
 
 model TicketComment {
-  id         String   @id @default(cuid())
-  ticketId   String
-  ticket     Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
-  authorId   String
-  author     User     @relation(fields: [authorId], references: [id])
-  content    String
-  isInternal Boolean  @default(false)
-  editedAt   DateTime?
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  ticketId       String
+  ticket         Ticket       @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  authorId       String
+  author         User         @relation(fields: [authorId], references: [id])
+  content        String
+  isInternal     Boolean      @default(false)
+  editedAt       DateTime?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
 
+  @@index([organizationId])
   @@index([ticketId])
 }
 
 model TicketStatusHistory {
-  id          String        @id @default(cuid())
-  ticketId    String
-  ticket      Ticket        @relation(fields: [ticketId], references: [id], onDelete: Cascade)
-  fromStatus  TicketStatus?
-  toStatus    TicketStatus
-  changedById String
-  changedBy   User          @relation(fields: [changedById], references: [id])
-  reason      String?
-  createdAt   DateTime      @default(now())
+  id             String        @id @default(cuid())
+  organizationId String
+  organization   Organization  @relation(fields: [organizationId], references: [id])
+  ticketId       String
+  ticket         Ticket        @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  fromStatus     TicketStatus?
+  toStatus       TicketStatus
+  changedById    String
+  changedBy      User          @relation(fields: [changedById], references: [id])
+  reason         String?
+  createdAt      DateTime      @default(now())
 
+  @@index([organizationId])
   @@index([ticketId])
 }
 
 model Attachment {
-  id           String   @id @default(cuid())
-  ticketId     String
-  ticket       Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
-  filename     String
-  originalName String
-  url          String
-  mimeType     String
-  sizeBytes    Int
-  uploadedById String
-  createdAt    DateTime @default(now())
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  ticketId       String
+  ticket         Ticket       @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  filename       String
+  originalName   String
+  url            String
+  mimeType       String
+  sizeBytes      Int
+  uploadedById   String
+  createdAt      DateTime     @default(now())
 
+  @@index([organizationId])
   @@index([ticketId])
 }
 
 // ─── Electronic Signatures (21 CFR Part 11) ───────────────────────────────────
 
 model ElectronicSignature {
-  id        String   @id @default(cuid())
-  ticketId  String
-  ticket    Ticket   @relation(fields: [ticketId], references: [id])
-  userId    String
-  user      User     @relation(fields: [userId], references: [id])
-  meaning   String
-  hash      String
-  ipAddress String?
-  signedAt  DateTime @default(now())
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  ticketId       String
+  ticket         Ticket       @relation(fields: [ticketId], references: [id])
+  userId         String
+  user           User         @relation(fields: [userId], references: [id])
+  meaning        String
+  hash           String
+  ipAddress      String?
+  signedAt       DateTime     @default(now())
 
+  @@index([organizationId])
   @@index([ticketId])
 }
 
 // ─── Audit Log (21 CFR Part 11) ───────────────────────────────────────────────
 
 model AuditLog {
-  id         String      @id @default(cuid())
-  userId     String?
-  user       User?       @relation(fields: [userId], references: [id])
-  action     AuditAction
-  resource   String
-  resourceId String?
-  oldValues  Json?
-  newValues  Json?
-  ipAddress  String?
-  userAgent  String?
-  notes      String?
-  createdAt  DateTime    @default(now())
+  id             String        @id @default(cuid())
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id])
+  userId         String?
+  user           User?         @relation(fields: [userId], references: [id])
+  action         AuditAction
+  resource       String
+  resourceId     String?
+  oldValues      Json?
+  newValues      Json?
+  ipAddress      String?
+  userAgent      String?
+  notes          String?
+  createdAt      DateTime      @default(now())
 
+  @@index([organizationId])
   @@index([userId])
   @@index([resource, resourceId])
   @@index([createdAt])
@@ -312,21 +457,80 @@ model AuditLog {
 // ─── Email Logs ───────────────────────────────────────────────────────────────
 
 model EmailLog {
-  id           String   @id @default(cuid())
-  to           String[]
-  cc           String[]
-  subject      String
-  templateName String?
-  status       String
-  errorMessage String?
-  ticketId     String?
-  ticket       Ticket?  @relation(fields: [ticketId], references: [id])
-  messageId    String?
-  sentAt       DateTime?
-  createdAt    DateTime @default(now())
+  id             String        @id @default(cuid())
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id])
+  to             String[]
+  cc             String[]
+  subject        String
+  templateName   String?
+  status         String
+  errorMessage   String?
+  ticketId       String?
+  ticket         Ticket?       @relation(fields: [ticketId], references: [id])
+  messageId      String?
+  sentAt         DateTime?
+  createdAt      DateTime      @default(now())
 
+  @@index([organizationId])
   @@index([ticketId])
   @@index([status])
+}
+
+// ─── Email Messages ───────────────────────────────────────────────────────────
+
+model EmailMessage {
+  id             String             @id @default(cuid())
+  organizationId String
+  organization   Organization       @relation(fields: [organizationId], references: [id])
+  direction      EmailDirection
+  provider       String
+  messageId      String?
+  inReplyTo      String?
+  references     String[]
+  from           String
+  to             String[]
+  cc             String[]
+  subject        String
+  textBody       String?
+  htmlBody       String?
+  status         EmailMessageStatus @default(RECEIVED)
+  errorMessage   String?
+  receivedAt     DateTime?
+  sentAt         DateTime?
+  processedAt    DateTime?
+  ticketId       String?
+  ticket         Ticket?            @relation(fields: [ticketId], references: [id])
+  userId         String?
+  user           User?              @relation(fields: [userId], references: [id])
+  attachments    EmailAttachment[]
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+
+  @@unique([organizationId, messageId])
+  @@index([organizationId])
+  @@index([ticketId])
+  @@index([userId])
+  @@index([direction])
+  @@index([status])
+  @@index([receivedAt])
+}
+
+model EmailAttachment {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  emailMessageId String
+  emailMessage   EmailMessage @relation(fields: [emailMessageId], references: [id], onDelete: Cascade)
+  filename       String
+  originalName   String
+  contentType    String
+  sizeBytes      Int
+  path           String
+  createdAt      DateTime     @default(now())
+
+  @@index([organizationId])
+  @@index([emailMessageId])
 }
 
 // ─── Notification Preferences ─────────────────────────────────────────────────
@@ -340,6 +544,36 @@ model NotificationPreference {
   onStatusChange  Boolean @default(true)
   onDueDateRemind Boolean @default(true)
   emailEnabled    Boolean @default(true)
+  smsEnabled      Boolean @default(false)
+}
+
+// ─── SMS Logs ─────────────────────────────────────────────────────────────────
+
+model SmsLog {
+  id                String        @id @default(cuid())
+  organizationId    String?
+  organization      Organization? @relation(fields: [organizationId], references: [id])
+  to                String
+  body              String
+  status            String
+  errorMessage      String?
+  providerErrorCode String?
+  provider          String        @default("twilio")
+  providerMessageId String?       @unique
+  userId            String?
+  user              User?         @relation(fields: [userId], references: [id])
+  ticketId          String?
+  ticket            Ticket?       @relation(fields: [ticketId], references: [id])
+  sentAt            DateTime?
+  deliveredAt       DateTime?
+  statusCallbackAt  DateTime?
+  createdAt         DateTime      @default(now())
+
+  @@index([organizationId])
+  @@index([userId])
+  @@index([ticketId])
+  @@index([status])
+  @@index([createdAt])
 }
 
 // ─── Mobile Push Notification Device Tokens ────────────────────────────────────
@@ -350,14 +584,17 @@ enum DevicePlatform {
 }
 
 model DeviceToken {
-  id        String         @id @default(cuid())
-  userId    String
-  user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
-  token     String         @unique
-  platform  DevicePlatform
-  active    Boolean        @default(true)
-  lastSeen  DateTime       @default(now())
-  createdAt DateTime       @default(now())
+  id             String         @id @default(cuid())
+  organizationId String
+  organization   Organization   @relation(fields: [organizationId], references: [id])
+  userId         String
+  user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token          String         @unique
+  platform       DevicePlatform
+  active         Boolean        @default(true)
+  lastSeen       DateTime       @default(now())
+  createdAt      DateTime       @default(now())
 
+  @@index([organizationId])
   @@index([userId])
 }

@@ -2,8 +2,9 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Search, Plus, Pencil, Settings, Trash2, X } from 'lucide-react';
 import api from '../api/client';
-import { Asset, AssetCategory, Location } from '../types';
+import { Asset, AssetCategory, Location, OrganizationSubscriptionResponse } from '../types';
 import { useAuth } from '../contexts/AuthContext';
+import { isLimitReached, limitMessage } from '../components/SubscriptionUsage';
 
 interface AssetFormData {
   name: string;
@@ -29,6 +30,12 @@ export default function AssetsPage() {
     queryKey: ['assets', search],
     queryFn: () => api.get('/assets', { params: { search: search || undefined } }).then((r) => r.data),
   });
+  const { data: subscription } = useQuery<OrganizationSubscriptionResponse>({
+    queryKey: ['organization-me'],
+    queryFn: () => api.get('/organizations/me').then((r) => r.data),
+  });
+
+  const assetLimitReached = isLimitReached(subscription?.organization, subscription?.usage, 'assets');
 
   return (
     <div className="space-y-4">
@@ -48,7 +55,9 @@ export default function AssetsPage() {
           {hasPermission('ASSET_CREATE') && (
             <button
               onClick={() => setModal({ mode: 'create' })}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
+              disabled={assetLimitReached}
+              title={assetLimitReached && subscription ? limitMessage(subscription.organization, 'assets') : undefined}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Plus size={16} />
               Add Asset
@@ -56,6 +65,11 @@ export default function AssetsPage() {
           )}
         </div>
       </div>
+      {assetLimitReached && subscription && (
+        <div className="bg-amber-50 text-amber-800 text-sm px-4 py-3 rounded-lg">
+          {limitMessage(subscription.organization, 'assets')} Upgrade to add more assets.
+        </div>
+      )}
 
       <div className="bg-white border border-gray-200 rounded-xl p-4 flex items-center gap-2">
         <Search size={16} className="text-gray-400" />
@@ -120,7 +134,11 @@ export default function AssetsPage() {
           mode={modal.mode}
           asset={modal.asset}
           onClose={() => setModal(null)}
-          onSuccess={() => { setModal(null); qc.invalidateQueries({ queryKey: ['assets'] }); }}
+          onSuccess={() => {
+            setModal(null);
+            qc.invalidateQueries({ queryKey: ['assets'] });
+            qc.invalidateQueries({ queryKey: ['organization-me'] });
+          }}
         />
       )}
 

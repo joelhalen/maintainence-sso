@@ -6,6 +6,55 @@ export type Permission =
   | 'ASSET_CREATE' | 'ASSET_READ' | 'ASSET_UPDATE' | 'ASSET_DELETE'
   | 'REPORT_VIEW' | 'REPORT_EXPORT' | 'ADMIN_PANEL' | 'AUDIT_LOG_VIEW' | 'EMAIL_SETTINGS';
 
+export type SubscriptionTier = 'FREE' | 'STARTER' | 'PROFESSIONAL' | 'ENTERPRISE';
+export type SubscriptionStatus = 'TRIALING' | 'ACTIVE' | 'PAST_DUE' | 'CANCELED' | 'EXPIRED';
+
+export interface SubscriptionLimits {
+  maxActiveUsers: number | null;
+  maxLocations: number | null;
+  maxAssets: number | null;
+  maxActiveTickets: number | null;
+  allowSms: boolean;
+  allowSso: boolean;
+  allowExports: boolean;
+}
+
+export interface OrganizationContext {
+  id: string;
+  name: string;
+  slug: string;
+  subscription: {
+    status: SubscriptionStatus;
+    provider: string;
+    providerCustomerId?: string | null;
+    paypalSubscriptionId?: string | null;
+    plan: {
+      id: string;
+      tier: SubscriptionTier;
+      name: string;
+      limits: SubscriptionLimits;
+    };
+  };
+}
+
+export interface UsageSummary {
+  activeUsers: number;
+  locations: number;
+  assets: number;
+  activeTickets: number;
+}
+
+export interface OrganizationSubscriptionResponse {
+  organization: OrganizationContext;
+  usage: UsageSummary;
+  billing?: {
+    provider: string;
+    providerCustomerId?: string | null;
+    paypalSubscriptionId?: string | null;
+    checkoutEnabled: boolean;
+  };
+}
+
 export type TicketStatus = 'OPEN' | 'IN_PROGRESS' | 'ON_HOLD' | 'PENDING_PARTS' | 'PENDING_REVIEW' | 'COMPLETED' | 'CLOSED' | 'CANCELLED';
 export type TicketPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
 export type TicketType = 'CORRECTIVE' | 'PREVENTIVE' | 'INSPECTION' | 'SAFETY' | 'PROJECT';
@@ -14,9 +63,12 @@ export interface User {
   id: string;
   email: string;
   name: string;
+  organizationId: string;
+  organization?: OrganizationContext;
   role: { id: string; name: string; permissions: Permission[] };
   department?: string;
   phone?: string;
+  phoneVerifiedAt?: string;
   active: boolean;
   lastLoginAt?: string;
 }

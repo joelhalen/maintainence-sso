@@ -1,5 +1,33 @@
 import { Request } from 'express';
-import { Permission, TicketStatus, TicketPriority, TicketType } from '@prisma/client';
+import { Permission, SubscriptionStatus, SubscriptionTier, TicketStatus, TicketPriority, TicketType } from '@prisma/client';
+
+export interface SubscriptionLimits {
+  maxActiveUsers: number | null;
+  maxLocations: number | null;
+  maxAssets: number | null;
+  maxActiveTickets: number | null;
+  allowSms: boolean;
+  allowSso: boolean;
+  allowExports: boolean;
+}
+
+export interface OrganizationContext {
+  id: string;
+  name: string;
+  slug: string;
+  subscription: {
+    status: SubscriptionStatus;
+    provider: string;
+    providerCustomerId?: string | null;
+    paypalSubscriptionId?: string | null;
+    plan: {
+      id: string;
+      tier: SubscriptionTier;
+      name: string;
+      limits: SubscriptionLimits;
+    };
+  };
+}
 
 export interface AuthUser {
   id: string;
@@ -8,6 +36,14 @@ export interface AuthUser {
   roleId: string;
   roleName: string;
   permissions: Permission[];
+  organizationId: string;
+  organization: OrganizationContext;
+}
+
+declare global {
+  namespace Express {
+    interface User extends AuthUser {}
+  }
 }
 
 export interface AuthRequest extends Request {
@@ -22,6 +58,7 @@ export interface JwtPayload {
   sub: string;
   email: string;
   roleId: string;
+  organizationId?: string;
   iat?: number;
   exp?: number;
 }
@@ -57,6 +94,17 @@ export interface EmailOptions {
   subject: string;
   html: string;
   text?: string;
+  replyTo?: string;
+  headers?: Record<string, string>;
+  organizationId?: string;
   ticketId?: string;
   templateName?: string;
+}
+
+export interface SmsOptions {
+  to: string;
+  body: string;
+  organizationId?: string;
+  userId?: string;
+  ticketId?: string;
 }

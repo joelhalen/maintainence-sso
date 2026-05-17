@@ -27,11 +27,13 @@ router.post(
         where: { token },
         update: {
           userId: req.user!.id,
+          organizationId: req.user!.organizationId,
           platform,
           active: true,
           lastSeen: new Date(),
         },
         create: {
+          organizationId: req.user!.organizationId,
           userId: req.user!.id,
           token,
           platform,
@@ -50,7 +52,7 @@ router.delete(
   async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
     try {
       await prisma.deviceToken.updateMany({
-        where: { token: req.params.token, userId: req.user!.id },
+        where: { token: req.params.token, userId: req.user!.id, organizationId: req.user!.organizationId },
         data: { active: false },
       });
       res.status(204).send();

@@ -8,6 +8,7 @@ import { writeAudit } from '../services/auditService';
 import { AuditAction } from '@prisma/client';
 import { authenticate } from '../middleware/auth';
 import { AuthRequest } from '../types';
+import { toOrganizationContext } from '../services/entitlementService';
 
 const router = Router();
 
@@ -34,7 +35,10 @@ router.post(
 
     const user = await prisma.user.findUnique({
       where: { email },
-      include: { role: true },
+      include: {
+        role: true,
+        organization: { include: { subscription: { include: { plan: true } } } },
+      },
     });
 
     if (!user || !user.passwordHash || !(await bcrypt.compare(password, user.passwordHash))) {
@@ -48,7 +52,7 @@ router.post(
       return;
     }
 
-    if (!user.active) {
+    if (!user.active || !user.organization.active) {
       next(new AppError(403, 'Account disabled'));
       return;
     }
@@ -56,10 +60,11 @@ router.post(
     await prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
     await writeAudit({ userId: user.id, action: AuditAction.LOGIN, resource: 'auth', ...meta });
 
+    const expiresIn = (process.env.JWT_EXPIRES_IN || '8h') as jwt.SignOptions['expiresIn'];
     const token = jwt.sign(
-      { sub: user.id, email: user.email, roleId: user.roleId },
+      { sub: user.id, email: user.email, roleId: user.roleId, organizationId: user.organizationId },
       process.env.JWT_SECRET!,
-      { expiresIn: process.env.JWT_EXPIRES_IN || '8h' }
+      { expiresIn }
     );
 
     res.json({
@@ -71,6 +76,8 @@ router.post(
         department: user.department,
         phone: user.phone,
         active: user.active,
+        organizationId: user.organizationId,
+        organization: toOrganizationContext(user.organization),
         role: {
           id: user.role.id,
           name: user.role.name,
@@ -94,9 +101,24 @@ router.post('/logout', authenticate, async (req: AuthRequest, res: Response): Pr
 router.get('/me', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
   const user = await prisma.user.findUnique({
     where: { id: req.user!.id },
-    include: { role: true, notificationPref: true },
+    include: {
+      role: true,
+      organization: { include: { subscription: { include: { plan: true } } } },
+    },
   });
-  res.json(user);
+  if (!user) {
+    res.status(404).json({ error: 'User not found' });
+    return;
+  }
+
+  const notificationPref = await prisma.notificationPreference.upsert({
+    where: { userId: user.id },
+    update: {},
+    create: { userId: user.id },
+  });
+
+  const { passwordHash: _, ...safeUser } = user;
+  res.json({ ...safeUser, organization: toOrganizationContext(user.organization), notificationPref });
 });
 
 export default router;

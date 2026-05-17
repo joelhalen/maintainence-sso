@@ -2,7 +2,7 @@ import { Outlet, NavLink } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import {
   LayoutDashboard, Ticket, Wrench, MapPin, Users, BarChart3,
-  LogOut, Menu, X, ChevronRight, Bell
+  LogOut, Menu, X, ChevronRight, Bell, CreditCard, Mail
 } from 'lucide-react';
 import { useState } from 'react';
 import clsx from 'clsx';
@@ -95,6 +95,34 @@ export default function Layout() {
             <Bell size={16} />
             Notifications
           </NavLink>
+          {hasPermission('ADMIN_PANEL') && (
+            <NavLink
+              to="/settings/organization"
+              onClick={() => setSidebarOpen(false)}
+              className={({ isActive }) =>
+                `flex items-center gap-2 w-full px-3 py-2 text-sm rounded-lg transition-colors mb-1 ${
+                  isActive ? 'bg-gray-800 text-white' : 'text-gray-400 hover:text-white hover:bg-gray-800'
+                }`
+              }
+            >
+              <CreditCard size={16} />
+              Subscription
+            </NavLink>
+          )}
+          {hasPermission('EMAIL_SETTINGS') && (
+            <NavLink
+              to="/settings/email"
+              onClick={() => setSidebarOpen(false)}
+              className={({ isActive }) =>
+                `flex items-center gap-2 w-full px-3 py-2 text-sm rounded-lg transition-colors mb-1 ${
+                  isActive ? 'bg-gray-800 text-white' : 'text-gray-400 hover:text-white hover:bg-gray-800'
+                }`
+              }
+            >
+              <Mail size={16} />
+              Email
+            </NavLink>
+          )}
           <button
             onClick={logout}
             className="flex items-center gap-2 w-full px-3 py-2 text-sm text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"

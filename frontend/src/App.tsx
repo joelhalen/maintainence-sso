@@ -12,6 +12,8 @@ import LocationsPage from './pages/Locations';
 import UsersPage from './pages/Users';
 import ReportsPage from './pages/Reports';
 import NotificationSettingsPage from './pages/NotificationSettings';
+import OrganizationSettingsPage from './pages/OrganizationSettings';
+import EmailSettingsPage from './pages/EmailSettings';
 
 class ErrorBoundary extends React.Component<
   { children: React.ReactNode },
@@ -73,6 +75,8 @@ function AppRoutes() {
         <Route path="users" element={<UsersPage />} />
         <Route path="reports" element={<ReportsPage />} />
         <Route path="settings/notifications" element={<NotificationSettingsPage />} />
+        <Route path="settings/organization" element={<OrganizationSettingsPage />} />
+        <Route path="settings/email" element={<EmailSettingsPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

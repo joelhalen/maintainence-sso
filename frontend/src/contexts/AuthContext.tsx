@@ -1,10 +1,11 @@
 import React, { createContext, useContext, useState, useCallback } from 'react';
 import api from '../api/client';
-import { User, Permission } from '../types';
+import { User, Permission, OrganizationContext } from '../types';
 
 interface AuthState {
   user: User | null;
   token: string | null;
+  organization: OrganizationContext | null;
 }
 
 interface AuthContextValue extends AuthState {
@@ -20,9 +21,12 @@ const getStoredAuth = (): AuthState => {
   try {
     const token = localStorage.getItem('auth_token');
     const user = localStorage.getItem('auth_user');
-    if (token && user) return { token, user: JSON.parse(user) };
+    if (token && user) {
+      const parsedUser = JSON.parse(user) as User;
+      return { token, user: parsedUser, organization: parsedUser.organization ?? null };
+    }
   } catch {}
-  return { token: null, user: null };
+  return { token: null, user: null, organization: null };
 };
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -32,14 +36,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const { data } = await api.post<{ token: string; user: User }>('/auth/login', { email, password });
     localStorage.setItem('auth_token', data.token);
     localStorage.setItem('auth_user', JSON.stringify(data.user));
-    setAuth({ token: data.token, user: data.user });
+    setAuth({ token: data.token, user: data.user, organization: data.user.organization ?? null });
   }, []);
 
   const logout = useCallback(async () => {
     try { await api.post('/auth/logout'); } catch {}
     localStorage.removeItem('auth_token');
     localStorage.removeItem('auth_user');
-    setAuth({ token: null, user: null });
+    setAuth({ token: null, user: null, organization: null });
     window.location.href = '/login';
   }, []);
 

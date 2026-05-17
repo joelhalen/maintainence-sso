@@ -52,7 +52,9 @@ router.post(
         return;
       }
 
-      const ticket = await prisma.ticket.findUnique({ where: { id: req.params.ticketId } });
+      const ticket = await prisma.ticket.findFirst({
+        where: { id: req.params.ticketId, organizationId: req.user!.organizationId },
+      });
       if (!ticket) {
         next(new AppError(404, 'Ticket not found'));
         return;
@@ -66,6 +68,7 @@ router.post(
 
       const signature = await prisma.electronicSignature.create({
         data: {
+          organizationId: req.user!.organizationId,
           ticketId: ticket.id,
           userId: req.user!.id,
           meaning: req.body.meaning,
@@ -76,6 +79,7 @@ router.post(
       });
 
       await writeAudit({
+        organizationId: req.user!.organizationId,
         userId: req.user!.id,
         action: AuditAction.SIGN,
         resource: 'tickets',
@@ -97,7 +101,7 @@ router.get(
   async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
     try {
       const signatures = await prisma.electronicSignature.findMany({
-        where: { ticketId: req.params.ticketId },
+        where: { ticketId: req.params.ticketId, organizationId: req.user!.organizationId },
         include: { user: { select: { id: true, name: true, email: true } } },
         orderBy: { signedAt: 'asc' },
       });

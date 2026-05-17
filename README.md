@@ -1,6 +1,8 @@
 # MegaMTX — Maintenance Management System
 
-A self-hosted maintenance ticket and asset tracking system for operations, facilities, and manufacturing teams. Supports FDA 21 CFR Part 11 audit trail requirements out of the box.
+A cloud-ready maintenance ticket and asset tracking system for operations, facilities, and manufacturing teams. MegaMTX supports both managed cloud tenancy with subscription-based entitlements and self-hosted deployments for teams that need direct infrastructure control.
+
+Supports FDA 21 CFR Part 11 audit trail requirements out of the box, with Microsoft SSO scaffolding, SMS, and ingress/egress email functionality.
 
 ## Stack
 
@@ -10,6 +12,7 @@ A self-hosted maintenance ticket and asset tracking system for operations, facil
 | Database  | PostgreSQL 16 |
 | Frontend  | React · TypeScript · Vite · Tailwind CSS |
 | Auth      | JWT · optional SAML SSO (Azure AD, Okta, etc.) |
+| Messaging | SMTP email · Twilio SMS |
 
 ---
 
@@ -21,6 +24,7 @@ A self-hosted maintenance ticket and asset tracking system for operations, facil
 cp backend/.env.example backend/.env
 # Set at minimum: DATABASE_URL, JWT_SECRET
 # Set SMTP_* values to enable email notifications
+# Set TWILIO_* values to enable SMS notifications
 # Set COMPANY_NAME to customise the UI label
 ```
 
@@ -103,6 +107,7 @@ pm2 startup   # enable auto-start on reboot
 2. **Create asset categories** — go to Assets → Categories and define the types relevant to your operation (e.g. *Production Equipment*, *Lab Instruments*, *Electrical*, *Utilities*).
 3. **Add assets** — register your equipment under the appropriate category and location.
 4. **Invite users** — go to Users, create accounts, and assign roles.
+5. **Review subscription usage** — go to Subscription to see the current organization, plan limits, PayPal billing scaffold, and usage meters.
 
 ---
 
@@ -123,15 +128,25 @@ Navigation items are hidden automatically when a user lacks the required permiss
 
 ---
 
+## Organizations & Subscription Entitlements
+
+MegaMTX is tenant-aware for cloud hosting. Users, roles, locations, assets, tickets, logs, signatures, and notification records are scoped to an organization. RBAC still controls what an individual user can do, while the organization's subscription plan controls product limits and feature availability.
+
+Seeded plans include `FREE`, `STARTER`, `PROFESSIONAL`, and `ENTERPRISE`. The free plan has caps for active users, locations, assets, and active tickets; higher tiers expand or remove those caps. PayPal provider fields are present for future checkout and webhook integration, but live billing is intentionally scaffolded only in this pass.
+
+---
+
 ## Key Features
 
 - **Ticket lifecycle** — OPEN → IN_PROGRESS → PENDING_PARTS / PENDING_REVIEW → COMPLETED → CLOSED with full status history
 - **Asset management** — track equipment with serial numbers, warranty dates, and maintenance history
 - **Location hierarchy** — nested sites, buildings, and zones
 - **Role-based access control** — 26 granular permissions assignable per role
+- **Organization tenancy and subscriptions** — plan-based limits for users, locations, assets, active tickets, SMS, SSO, and exports
 - **Audit trail** — append-only log of every action (supports 21 CFR Part 11)
 - **Electronic signatures** — cryptographic sign-off on ticket completion
-- **Email notifications** — configurable per-user via SMTP
+- **Email management** — SMTP egress, super-admin test/log views, IMAP ingress polling, and ticket reply threading
+- **SMS notifications** — optional Twilio integration for ticket updates and future verification / 2FA flows
 - **File attachments** — photos and documents on tickets
 - **Export** — CSV / JSON ticket export
 - **SAML SSO** — optional Azure AD / Okta integration via `SAML_*` env vars
@@ -149,6 +164,14 @@ Navigation items are hidden automatically when a user lacks the required permiss
 | `TICKET_NUMBER_PREFIX` | Prefix for ticket IDs | `MNT` |
 | `COMPANY_NAME` | Display name in UI | — |
 | `SMTP_HOST/PORT/USER/PASS` | Email delivery | — |
+| `EMAIL_REPLY_DOMAIN` / `EMAIL_REPLY_LOCAL_PART` | Reply-to address generation for ticket threading | — |
+| `IMAP_*` | Inbound mailbox polling for received/reply emails | — |
+| `DEFAULT_ORGANIZATION_ID` | Fallback organization for unmatched inbound mail | — |
+| `TWILIO_ACCOUNT_SID` | Twilio account SID for SMS delivery | — |
+| `TWILIO_AUTH_TOKEN` | Twilio auth token for SMS delivery | — |
+| `TWILIO_FROM_NUMBER` | Twilio sender number in E.164 format | — |
+| `TWILIO_STATUS_CALLBACK_URL` | Public Twilio delivery-status webhook URL | — |
+| `PAYPAL_*` | PayPal billing placeholders for future checkout/webhooks | — |
 | `SAML_*` | SSO configuration | — |
 
 Full variable list: `backend/.env.example`

@@ -41,8 +41,8 @@ router.post(
 
 router.get('/:id', requirePermission(Permission.TICKET_READ), async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const ticket = await prisma.ticket.findUnique({
-      where: { id: req.params.id },
+    const ticket = await prisma.ticket.findFirst({
+      where: { id: req.params.id, organizationId: req.user!.organizationId },
       include: {
         location: true,
         asset: { include: { category: true, location: true } },
@@ -74,7 +74,7 @@ router.patch(
   requirePermission(Permission.TICKET_UPDATE),
   async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const old = await prisma.ticket.findUnique({ where: { id: req.params.id } });
+      const old = await prisma.ticket.findFirst({ where: { id: req.params.id, organizationId: req.user!.organizationId } });
       if (!old) { next(new AppError(404, 'Ticket not found')); return; }
 
       const allowed = ['title', 'description', 'priority', 'type', 'dueDate', 'estimatedHours', 'tags', 'assetId', 'assignedToId'];
@@ -83,9 +83,19 @@ router.patch(
         if (req.body[key] !== undefined) data[key] = req.body[key];
       }
 
-      const updated = await prisma.ticket.update({ where: { id: req.params.id }, data });
+      if (data.assetId) {
+        const asset = await prisma.asset.findFirst({ where: { id: String(data.assetId), organizationId: req.user!.organizationId } });
+        if (!asset) { next(new AppError(400, 'Asset is not available for this organization')); return; }
+      }
+      if (data.assignedToId) {
+        const assignee = await prisma.user.findFirst({ where: { id: String(data.assignedToId), organizationId: req.user!.organizationId } });
+        if (!assignee) { next(new AppError(400, 'Assignee is not available for this organization')); return; }
+      }
+
+      const updated = await prisma.ticket.update({ where: { id: old.id }, data });
 
       await writeAudit({
+        organizationId: req.user!.organizationId,
         userId: req.user!.id,
         action: AuditAction.UPDATE,
         resource: 'tickets',
@@ -125,8 +135,14 @@ router.post(
     const errors = validationResult(req);
     if (!errors.isEmpty()) { next(new AppError(400, 'Comment content required')); return; }
     try {
+      const ticket = await prisma.ticket.findFirst({
+        where: { id: req.params.id, organizationId: req.user!.organizationId },
+      });
+      if (!ticket) { next(new AppError(404, 'Ticket not found')); return; }
+
       const comment = await prisma.ticketComment.create({
         data: {
+          organizationId: req.user!.organizationId,
           ticketId: req.params.id,
           authorId: req.user!.id,
           content: req.body.content,
@@ -144,8 +160,14 @@ router.delete(
   requirePermission(Permission.TICKET_DELETE),
   async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
     try {
-      await prisma.ticket.delete({ where: { id: req.params.id } });
+      const ticket = await prisma.ticket.findFirst({
+        where: { id: req.params.id, organizationId: req.user!.organizationId },
+      });
+      if (!ticket) { next(new AppError(404, 'Ticket not found')); return; }
+
+      await prisma.ticket.delete({ where: { id: ticket.id } });
       await writeAudit({
+        organizationId: req.user!.organizationId,
         userId: req.user!.id,
         action: AuditAction.DELETE,
         resource: 'tickets',
