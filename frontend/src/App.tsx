@@ -19,6 +19,7 @@ import PlatformDashboardPage from './pages/PlatformDashboard';
 import PlatformOrganizationsPage from './pages/PlatformOrganizations';
 import PlatformPlansPage from './pages/PlatformPlans';
 import PlatformRolesPage from './pages/PlatformRoles';
+import GroupsPage from './pages/Groups';
 
 class ErrorBoundary extends React.Component<
   { children: React.ReactNode },
@@ -88,6 +89,7 @@ function AppRoutes() {
         <Route path="platform/organizations" element={<PlatformOrganizationsPage />} />
         <Route path="platform/organizations/:organizationId/roles" element={<PlatformRolesPage />} />
         <Route path="platform/plans" element={<PlatformPlansPage />} />
+        <Route path="groups" element={<GroupsPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
