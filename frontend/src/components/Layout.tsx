@@ -2,7 +2,7 @@ import { Outlet, NavLink, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import {
   LayoutDashboard, Ticket, Wrench, MapPin, Users, BarChart3,
-  LogOut, Menu, X, ChevronRight, Bell, CreditCard, Mail, MessageSquare, ShieldCheck
+  LogOut, Menu, X, ChevronRight, Bell, CreditCard, Mail, ShieldCheck
 } from 'lucide-react';
 import { useState } from 'react';
 import clsx from 'clsx';
@@ -125,7 +125,7 @@ export default function Layout() {
                 Email
               </NavLink>
               <NavLink
-                to="/settings/sms"
+                to="/settings/push"
                 onClick={() => setSidebarOpen(false)}
                 className={({ isActive }) =>
                   `flex items-center gap-2 w-full px-3 py-2 text-sm rounded-lg transition-colors mb-1 ${
@@ -133,8 +133,8 @@ export default function Layout() {
                   }`
                 }
               >
-                <MessageSquare size={16} />
-                SMS
+                <Bell size={16} />
+                Push Notifications
               </NavLink>
             </>
           )}

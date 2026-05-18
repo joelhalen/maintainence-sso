@@ -25,7 +25,7 @@ function toLimits(plan: SubscriptionWithPlan['plan']): SubscriptionLimits {
     maxLocations: plan.maxLocations,
     maxAssets: plan.maxAssets,
     maxActiveTickets: plan.maxActiveTickets,
-    allowSms: plan.allowSms,
+    allowPush: plan.allowPush,
     allowSso: plan.allowSso,
     allowExports: plan.allowExports,
   };

@@ -426,7 +426,7 @@ router.patch(
     body('maxLocations').optional({ nullable: true }).isInt({ min: 0 }),
     body('maxAssets').optional({ nullable: true }).isInt({ min: 0 }),
     body('maxActiveTickets').optional({ nullable: true }).isInt({ min: 0 }),
-    body('allowSms').optional().isBoolean(),
+    body('allowPush').optional().isBoolean(),
     body('allowSso').optional().isBoolean(),
     body('allowExports').optional().isBoolean(),
     body('paypalPlanId').optional({ nullable: true }).isString(),

@@ -12,7 +12,7 @@ interface Plan {
   maxLocations?: number | null;
   maxAssets?: number | null;
   maxActiveTickets?: number | null;
-  allowSms: boolean;
+  allowPush: boolean;
   allowSso: boolean;
   allowExports: boolean;
   active: boolean;
@@ -119,7 +119,7 @@ function PlanCard({ serverPlan, onSave }: PlanCardProps) {
     </div>
   );
 
-  const featureToggle = (field: 'allowSms' | 'allowSso' | 'allowExports', label: string) => (
+  const featureToggle = (field: 'allowPush' | 'allowSso' | 'allowExports', label: string) => (
     <button
       type="button"
       onClick={() => set(field, !local[field])}
@@ -229,7 +229,7 @@ function PlanCard({ serverPlan, onSave }: PlanCardProps) {
         <div>
           <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Features</h3>
           <div className="flex flex-wrap gap-2">
-            {featureToggle('allowSms', 'SMS')}
+            {featureToggle('allowPush', 'Push')}
             {featureToggle('allowSso', 'SSO')}
             {featureToggle('allowExports', 'Exports')}
           </div>

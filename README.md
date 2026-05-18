@@ -2,7 +2,7 @@
 
 A cloud-ready maintenance ticket and asset tracking system for operations, facilities, and manufacturing teams. MegaMTX supports both managed cloud tenancy with subscription-based entitlements and self-hosted deployments for teams that need direct infrastructure control.
 
-Supports FDA 21 CFR Part 11 audit trail requirements out of the box, with Microsoft SSO scaffolding, SMS, and ingress/egress email functionality.
+Supports FDA 21 CFR Part 11 audit trail requirements out of the box, with Microsoft SSO scaffolding, mobile push notifications, and ingress/egress email functionality.
 
 ## Stack
 
@@ -12,7 +12,8 @@ Supports FDA 21 CFR Part 11 audit trail requirements out of the box, with Micros
 | Database  | PostgreSQL 16 |
 | Frontend  | React · TypeScript · Vite · Tailwind CSS |
 | Auth      | JWT · optional SAML SSO (Azure AD, Okta, etc.) |
-| Messaging | SMTP email · Twilio SMS |
+| Messaging | SMTP email · Firebase Cloud Messaging (push) |
+| Mobile    | Capacitor 6 (iOS + Android native shell) |
 
 ---
 
@@ -24,7 +25,7 @@ Supports FDA 21 CFR Part 11 audit trail requirements out of the box, with Micros
 cp backend/.env.example backend/.env
 # Set at minimum: DATABASE_URL, JWT_SECRET
 # Set SMTP_* values to enable email notifications
-# Set TWILIO_* values to enable SMS notifications
+# Set FIREBASE_* values to enable push notifications
 # Set COMPANY_NAME to customise the UI label
 ```
 
@@ -101,6 +102,31 @@ pm2 startup   # enable auto-start on reboot
 
 ---
 
+## Mobile (iOS / Android)
+
+MegaMTX ships a **Capacitor 6** wrapper that packages the React web app into native iOS and Android apps, enabling native push notifications.
+
+```bash
+cd frontend
+
+# Initial native project setup (one-time)
+npm install
+npx cap add ios
+npx cap add android
+
+# After any frontend code change
+npm run build
+npx cap sync
+
+# Open in Xcode / Android Studio
+npx cap open ios
+npx cap open android
+```
+
+**Push notifications** are delivered via Firebase Cloud Messaging. Configure `FIREBASE_*` env vars on the backend and add `google-services.json` (Android) / `GoogleService-Info.plist` (iOS) to their respective native project directories.
+
+---
+
 ## Initial Setup (after first login)
 
 1. **Create locations** — go to Locations and add your facility, buildings, or zones.
@@ -142,11 +168,12 @@ Seeded plans include `FREE`, `STARTER`, `PROFESSIONAL`, and `ENTERPRISE`. The fr
 - **Asset management** — track equipment with serial numbers, warranty dates, and maintenance history
 - **Location hierarchy** — nested sites, buildings, and zones
 - **Role-based access control** — 26 granular permissions assignable per role
-- **Organization tenancy and subscriptions** — plan-based limits for users, locations, assets, active tickets, SMS, SSO, and exports
+- **Organization tenancy and subscriptions** — plan-based limits for users, locations, assets, active tickets, push, SSO, and exports
 - **Audit trail** — append-only log of every action (supports 21 CFR Part 11)
 - **Electronic signatures** — cryptographic sign-off on ticket completion
 - **Email management** — SMTP egress, super-admin test/log views, IMAP ingress polling, and ticket reply threading
-- **SMS notifications** — optional Twilio integration for ticket updates and future verification / 2FA flows
+- **Push notifications** — Firebase Cloud Messaging (FCM) for iOS, Android, and web; per-user preferences; push log with delivery tracking
+- **Mobile apps** — Capacitor 6 native shell for iOS and Android; registers device tokens automatically on sign-in
 - **File attachments** — photos and documents on tickets
 - **Export** — CSV / JSON ticket export
 - **SAML SSO** — optional Azure AD / Okta integration via `SAML_*` env vars
@@ -167,10 +194,10 @@ Seeded plans include `FREE`, `STARTER`, `PROFESSIONAL`, and `ENTERPRISE`. The fr
 | `EMAIL_REPLY_DOMAIN` / `EMAIL_REPLY_LOCAL_PART` | Reply-to address generation for ticket threading | — |
 | `IMAP_*` | Inbound mailbox polling for received/reply emails | — |
 | `DEFAULT_ORGANIZATION_ID` | Fallback organization for unmatched inbound mail | — |
-| `TWILIO_ACCOUNT_SID` | Twilio account SID for SMS delivery | — |
-| `TWILIO_AUTH_TOKEN` | Twilio auth token for SMS delivery | — |
-| `TWILIO_FROM_NUMBER` | Twilio sender number in E.164 format | — |
-| `TWILIO_STATUS_CALLBACK_URL` | Public Twilio delivery-status webhook URL | — |
+| `FIREBASE_PROJECT_ID` | Firebase project for FCM push notifications | — |
+| `FIREBASE_PRIVATE_KEY` | Firebase service account private key | — |
+| `FIREBASE_CLIENT_EMAIL` | Firebase service account email | — |
+| `FIREBASE_SERVICE_ACCOUNT_JSON` | Full service account JSON (alternative to above three) | — |
 | `PAYPAL_*` | PayPal billing placeholders for future checkout/webhooks | — |
 | `SAML_*` | SSO configuration | — |
 

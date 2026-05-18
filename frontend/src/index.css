@@ -3,7 +3,18 @@
 @tailwind utilities;
 
 @layer base {
+  /* Expose iOS/Android safe-area insets as CSS variables for padding around notches */
+  :root {
+    --safe-area-inset-top: env(safe-area-inset-top, 0px);
+    --safe-area-inset-right: env(safe-area-inset-right, 0px);
+    --safe-area-inset-bottom: env(safe-area-inset-bottom, 0px);
+    --safe-area-inset-left: env(safe-area-inset-left, 0px);
+  }
+
   body {
     @apply bg-gray-50 text-gray-900 antialiased;
+    /* Prevent content from being hidden behind native OS chrome */
+    padding-top: var(--safe-area-inset-top);
+    padding-bottom: var(--safe-area-inset-bottom);
   }
 }

@@ -28,7 +28,7 @@ interface Plan {
   maxLocations?: number | null;
   maxAssets?: number | null;
   maxActiveTickets?: number | null;
-  allowSms: boolean;
+  allowPush: boolean;
   allowSso: boolean;
   allowExports: boolean;
 }
@@ -317,7 +317,7 @@ function OverviewTab({ org }: { org: OrgDetail }) {
 
               <div className="space-y-1.5">
                 <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Features</p>
-                <FeatureFlag label="SMS Notifications" enabled={plan.allowSms} />
+                <FeatureFlag label="Push Notifications" enabled={plan.allowPush} />
                 <FeatureFlag label="Single Sign-On" enabled={plan.allowSso} />
                 <FeatureFlag label="Data Exports" enabled={plan.allowExports} />
               </div>
