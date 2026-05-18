@@ -10,6 +10,9 @@
     "lint": "eslint src --ext ts,tsx"
   },
   "dependencies": {
+    "@capacitor/core": "^6.0.0",
+    "@capacitor/push-notifications": "^6.0.0",
+    "@capacitor/status-bar": "^6.0.0",
     "@tanstack/react-query": "^5.45.0",
     "@tanstack/react-table": "^8.19.2",
     "axios": "^1.7.2",
@@ -25,6 +28,9 @@
     "@hookform/resolvers": "^3.6.0"
   },
   "devDependencies": {
+    "@capacitor/android": "^6.0.0",
+    "@capacitor/cli": "^6.0.0",
+    "@capacitor/ios": "^6.0.0",
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^4.3.1",

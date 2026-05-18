@@ -148,7 +148,7 @@ model Organization {
   emailLogs        EmailLog[]
   emailMessages    EmailMessage[]
   emailAttachments EmailAttachment[]
-  smsLogs          SmsLog[]
+  pushLogs         PushLog[]
   deviceTokens     DeviceToken[]
   subscription     OrganizationSubscription?
 
@@ -165,7 +165,7 @@ model SubscriptionPlan {
   maxLocations      Int?
   maxAssets         Int?
   maxActiveTickets  Int?
-  allowSms          Boolean          @default(false)
+  allowPush         Boolean          @default(false)
   allowSso          Boolean          @default(false)
   allowExports      Boolean          @default(false)
   paypalPlanId      String?          @unique
@@ -211,30 +211,26 @@ model User {
   organizationId  String
   organization    Organization @relation(fields: [organizationId], references: [id])
   department      String?
-  phone           String?
-  phoneVerifiedAt DateTime?
-  phoneVerified   Boolean      @default(false)
   isPlatformAdmin Boolean      @default(false)
   active          Boolean      @default(true)
   lastLoginAt     DateTime?
   createdAt       DateTime     @default(now())
   updatedAt       DateTime     @updatedAt
 
-  createdTickets    Ticket[]                @relation("TicketCreatedBy")
-  assignedTickets   Ticket[]                @relation("TicketAssignedTo")
-  completedTickets  Ticket[]                @relation("TicketCompletedBy")
-  closedTickets     Ticket[]                @relation("TicketClosedBy")
-  comments          TicketComment[]
-  statusHistory     TicketStatusHistory[]
-  auditLogs         AuditLog[]
-  notificationPref  NotificationPreference?
-  signatures        ElectronicSignature[]
-  deviceTokens      DeviceToken[]
-  smsLogs           SmsLog[]
-  emailMessages     EmailMessage[]
-  groupMemberships  GroupMembership[]
-  permissionRules   PermissionRule[]
-  phoneVerification PhoneVerification?
+  createdTickets   Ticket[]                @relation("TicketCreatedBy")
+  assignedTickets  Ticket[]                @relation("TicketAssignedTo")
+  completedTickets Ticket[]                @relation("TicketCompletedBy")
+  closedTickets    Ticket[]                @relation("TicketClosedBy")
+  comments         TicketComment[]
+  statusHistory    TicketStatusHistory[]
+  auditLogs        AuditLog[]
+  notificationPref NotificationPreference?
+  signatures       ElectronicSignature[]
+  deviceTokens     DeviceToken[]
+  pushLogs         PushLog[]
+  emailMessages    EmailMessage[]
+  groupMemberships GroupMembership[]
+  permissionRules  PermissionRule[]
 
   @@index([email])
   @@index([isPlatformAdmin])
@@ -264,7 +260,7 @@ model Group {
   id          String            @id @default(cuid())
   name        String            @unique
   description String?
-  color       String?           // hex colour for UI badge
+  color       String?
   members     GroupMembership[]
   rules       PermissionRule[]
   createdAt   DateTime          @default(now())
@@ -285,10 +281,6 @@ model GroupMembership {
 }
 
 // ─── Granular Permission Rules ────────────────────────────────────────────────
-// A rule targets either a User OR a Group (exactly one must be set).
-// Scope is optionally narrowed to a specific Location and/or TicketType.
-// null scope means "applies everywhere / all types".
-// DENY takes precedence over ALLOW when rules conflict.
 
 model PermissionRule {
   id         String      @id @default(cuid())
@@ -308,19 +300,6 @@ model PermissionRule {
   @@index([userId])
   @@index([groupId])
   @@index([locationId])
-}
-
-// ─── Phone / SMS Verification ─────────────────────────────────────────────────
-
-model PhoneVerification {
-  id        String   @id @default(cuid())
-  userId    String   @unique
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  phone     String
-  codeHash  String
-  expiresAt DateTime
-  attempts  Int      @default(0)
-  createdAt DateTime @default(now())
 }
 
 // ─── Locations ────────────────────────────────────────────────────────────────
@@ -433,7 +412,7 @@ model Ticket {
   statusHistory TicketStatusHistory[]
   emailLogs     EmailLog[]
   emailMessages EmailMessage[]
-  smsLogs       SmsLog[]
+  pushLogs      PushLog[]
   signatures    ElectronicSignature[]
 
   createdAt DateTime @default(now())
@@ -545,7 +524,7 @@ model AuditLog {
   @@index([action])
 }
 
-// ─── Email / SMS Logs ─────────────────────────────────────────────────────────
+// ─── Email / Push Logs ────────────────────────────────────────────────────────
 
 model EmailLog {
   id             String        @id @default(cuid())
@@ -624,32 +603,28 @@ model EmailAttachment {
   @@index([emailMessageId])
 }
 
-// ─── SMS Logs ─────────────────────────────────────────────────────────────────
+// ─── Push Notification Logs ───────────────────────────────────────────────────
 
-model SmsLog {
+model PushLog {
   id                String        @id @default(cuid())
   organizationId    String?
   organization      Organization? @relation(fields: [organizationId], references: [id])
-  to                String
-  body              String
-  templateName      String?
-  status            String
-  errorMessage      String?
-  providerErrorCode String?
-  provider          String        @default("twilio")
-  providerMessageId String?       @unique
-  messageId         String?
   userId            String?
   user              User?         @relation(fields: [userId], references: [id])
   ticketId          String?
   ticket            Ticket?       @relation(fields: [ticketId], references: [id])
+  deviceTokenId     String?
+  templateName      String?
+  title             String
+  body              String
+  status            String
+  errorMessage      String?
+  provider          String        @default("fcm")
+  providerMessageId String?
   sentAt            DateTime?
-  deliveredAt       DateTime?
-  statusCallbackAt  DateTime?
   createdAt         DateTime      @default(now())
 
   @@index([organizationId])
-  @@index([to])
   @@index([userId])
   @@index([ticketId])
   @@index([status])
@@ -668,18 +643,19 @@ model NotificationPreference {
   onComment       Boolean @default(true)
   onStatusChange  Boolean @default(true)
   onDueDateRemind Boolean @default(true)
-  // SMS
-  smsEnabled      Boolean @default(false)
-  onAssignSms     Boolean @default(false)
-  onStatusSms     Boolean @default(false)
-  onCommentSms    Boolean @default(false)
+  // Push
+  pushEnabled     Boolean @default(false)
+  onAssignPush    Boolean @default(true)
+  onStatusPush    Boolean @default(true)
+  onCommentPush   Boolean @default(true)
 }
 
-// ─── Mobile Push Notification Device Tokens ────────────────────────────────────
+// ─── Mobile Push Notification Device Tokens ───────────────────────────────────
 
 enum DevicePlatform {
   IOS
   ANDROID
+  WEB
 }
 
 model DeviceToken {

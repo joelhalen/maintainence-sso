@@ -1,6 +1,5 @@
-import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Phone, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
+import { Bell, Smartphone, CheckCircle } from 'lucide-react';
 import api from '../api/client';
 
 interface NotificationPref {
@@ -10,32 +9,31 @@ interface NotificationPref {
   onStatusChange: boolean;
   onDueDateRemind: boolean;
   emailEnabled: boolean;
-  smsEnabled: boolean;
-  onAssignSms: boolean;
-  onStatusSms: boolean;
-  onCommentSms: boolean;
+  pushEnabled: boolean;
+  onAssignPush: boolean;
+  onStatusPush: boolean;
+  onCommentPush: boolean;
 }
 
-interface PhoneStatus {
-  phone: string | null;
-  phoneVerified: boolean;
+interface DeviceToken {
+  id: string;
+  platform: 'IOS' | 'ANDROID' | 'WEB';
+  active: boolean;
+  lastSeen: string;
+  createdAt: string;
 }
 
 export default function NotificationSettingsPage() {
   const qc = useQueryClient();
-  const [phoneInput, setPhoneInput] = useState('');
-  const [codeInput, setCodeInput] = useState('');
-  const [verifyStep, setVerifyStep] = useState<'idle' | 'sent' | 'confirmed'>('idle');
-  const [verifyError, setVerifyError] = useState('');
 
   const { data: prefs, isLoading } = useQuery<NotificationPref>({
     queryKey: ['notification-prefs'],
     queryFn: () => api.get('/auth/me').then((r) => r.data.notificationPref),
   });
 
-  const { data: phoneStatus, isLoading: phoneLoading } = useQuery<PhoneStatus>({
-    queryKey: ['phone-status'],
-    queryFn: () => api.get('/phone/status').then((r) => r.data),
+  const { data: devices } = useQuery<DeviceToken[]>({
+    queryKey: ['my-devices'],
+    queryFn: () => api.get('/devices').then((r) => r.data).catch(() => []),
   });
 
   const prefMutation = useMutation({
@@ -44,90 +42,41 @@ export default function NotificationSettingsPage() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['notification-prefs'] }),
   });
 
-  const sendCodeMutation = useMutation({
-    mutationFn: (phone: string) => api.post('/phone/verify', { phone }).then((r) => r.data),
-    onSuccess: () => {
-      setVerifyStep('sent');
-      setVerifyError('');
-    },
-    onError: () => setVerifyError('Failed to send verification code. Check the number and try again.'),
-  });
-
-  const confirmCodeMutation = useMutation({
-    mutationFn: (code: string) => api.post('/phone/confirm', { code }).then((r) => r.data),
-    onSuccess: (data: { result: string }) => {
-      if (data.result === 'ok') {
-        setVerifyStep('confirmed');
-        setVerifyError('');
-        qc.invalidateQueries({ queryKey: ['phone-status'] });
-        qc.invalidateQueries({ queryKey: ['notification-prefs'] });
-      } else {
-        const msgs: Record<string, string> = {
-          invalid: 'Incorrect code. Please try again.',
-          expired: 'Code expired. Request a new one.',
-          too_many_attempts: 'Too many attempts. Please request a new code.',
-        };
-        setVerifyError(msgs[data.result] || 'Verification failed.');
-      }
-    },
-    onError: () => setVerifyError('Something went wrong. Please try again.'),
-  });
-
   const toggle = (key: keyof NotificationPref) => {
     if (!prefs) return;
     prefMutation.mutate({ [key]: !prefs[key] });
   };
 
+  const busy = isLoading || prefMutation.isPending;
+
   const EMAIL_SETTINGS = [
-    { key: 'onAssign' as const,       label: 'Ticket assigned to me',        description: 'When a ticket is assigned to you' },
-    { key: 'onComment' as const,      label: 'New comment on my tickets',     description: 'When someone comments on a ticket you own or are assigned to' },
-    { key: 'onStatusChange' as const, label: 'Status changes',                description: 'When a ticket status changes' },
-    { key: 'onDueDateRemind' as const,label: 'Due date reminders',            description: 'When tickets are approaching or past their due date' },
+    { key: 'onAssign' as const,       label: 'Ticket assigned to me',    description: 'When a ticket is assigned to you' },
+    { key: 'onComment' as const,      label: 'New comment on my tickets', description: 'When someone comments on a ticket you own or are assigned to' },
+    { key: 'onStatusChange' as const, label: 'Status changes',            description: 'When a ticket status changes' },
+    { key: 'onDueDateRemind' as const,label: 'Due date reminders',        description: 'When tickets are approaching or past their due date' },
   ];
 
-  const SMS_SETTINGS = [
-    { key: 'onAssignSms' as const,  label: 'Ticket assigned to me',  description: 'SMS when a ticket is assigned to you' },
-    { key: 'onStatusSms' as const,  label: 'Status changes',         description: 'SMS when a ticket status changes' },
-    { key: 'onCommentSms' as const, label: 'New comments',           description: 'SMS when someone comments on your tickets' },
+  const PUSH_SETTINGS = [
+    { key: 'onAssignPush' as const,  label: 'Ticket assigned to me', description: 'Push alert when a ticket is assigned to you' },
+    { key: 'onStatusPush' as const,  label: 'Status changes',        description: 'Push alert when a ticket status changes' },
+    { key: 'onCommentPush' as const, label: 'New comments',          description: 'Push alert when someone comments on your tickets' },
   ];
 
-  const isVerified = phoneStatus?.phoneVerified && !!phoneStatus?.phone;
-  const busy = isLoading || phoneLoading || prefMutation.isPending;
+  const activeDevices = devices?.filter((d) => d.active) ?? [];
+  const platformLabel: Record<string, string> = { IOS: 'iOS', ANDROID: 'Android', WEB: 'Web' };
 
   return (
     <div className="max-w-2xl space-y-6">
       <h1 className="text-xl font-semibold text-gray-900">Notification Settings</h1>
 
-      {/* Email */}
+      {/* Email channel */}
       <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
         <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
           <div>
-            <h2 className="text-sm font-semibold text-gray-700">Delivery Channels</h2>
-            <p className="text-xs text-gray-400 mt-0.5">Choose where enabled notification events are sent</p>
+            <h2 className="text-sm font-semibold text-gray-700">Email Notifications</h2>
+            <p className="text-xs text-gray-400 mt-0.5">Receive emails for ticket activity</p>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-gray-500">All email</span>
-            <Toggle on={!!prefs?.emailEnabled} onClick={() => toggle('emailEnabled')} disabled={busy} />
-          </div>
-        </div>
-
-        <div className="divide-y divide-gray-50">
-          <div className="flex items-center justify-between px-5 py-4">
-            <div>
-              <div className="text-sm font-medium text-gray-800">Email notifications</div>
-              <div className="text-xs text-gray-400 mt-0.5">Send notifications to your registered email address</div>
-            </div>
-            <Toggle on={!!prefs?.emailEnabled} onClick={() => toggle('emailEnabled')} disabled={busy} />
-          </div>
-        </div>
-      </div>
-
-      <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-        <div className="px-5 py-4 border-b border-gray-100">
-          <div>
-            <h2 className="text-sm font-semibold text-gray-700">Notification Events</h2>
-            <p className="text-xs text-gray-400 mt-0.5">These event settings apply to every enabled delivery channel</p>
-          </div>
+          <Toggle on={!!prefs?.emailEnabled} onClick={() => toggle('emailEnabled')} disabled={busy} />
         </div>
         <div className="divide-y divide-gray-50">
           {EMAIL_SETTINGS.map(({ key, label, description }) => (
@@ -136,124 +85,60 @@ export default function NotificationSettingsPage() {
                 <div className="text-sm font-medium text-gray-800">{label}</div>
                 <div className="text-xs text-gray-400 mt-0.5">{description}</div>
               </div>
-              <Toggle
-                on={!!prefs?.[key]}
-                onClick={() => toggle(key)}
-                disabled={!prefs?.emailEnabled || busy}
-              />
+              <Toggle on={!!prefs?.[key]} onClick={() => toggle(key)} disabled={!prefs?.emailEnabled || busy} />
             </div>
           ))}
         </div>
       </div>
 
-      {/* SMS — phone verification */}
+      {/* Push notifications */}
       <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
         <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
           <div>
-            <h2 className="text-sm font-semibold text-gray-700">SMS Notifications</h2>
+            <h2 className="text-sm font-semibold text-gray-700">Push Notifications</h2>
             <p className="text-xs text-gray-400 mt-0.5">
-              Receive text messages for critical updates — requires a verified phone number
+              Instant alerts on your registered mobile devices and browsers
             </p>
           </div>
-          {isVerified && (
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-gray-500">All SMS</span>
-              <Toggle on={!!prefs?.smsEnabled} onClick={() => toggle('smsEnabled')} disabled={busy} />
-            </div>
-          )}
+          <Toggle on={!!prefs?.pushEnabled} onClick={() => toggle('pushEnabled')} disabled={busy} />
         </div>
 
         <div className="px-5 py-5 space-y-4">
-          {/* Verification status banner */}
-          {isVerified ? (
-            <div className="flex items-center gap-2 text-sm text-green-700 bg-green-50 border border-green-100 rounded-lg px-4 py-3">
-              <CheckCircle size={16} className="flex-shrink-0" />
-              <span>Verified: <strong>{phoneStatus!.phone}</strong></span>
-              <button
-                className="ml-auto text-xs text-gray-500 hover:text-gray-700 underline"
-                onClick={() => { setVerifyStep('idle'); setPhoneInput(''); setCodeInput(''); setVerifyError(''); }}
-              >
-                Change number
-              </button>
-            </div>
-          ) : verifyStep === 'confirmed' ? (
-            <div className="flex items-center gap-2 text-sm text-green-700 bg-green-50 border border-green-100 rounded-lg px-4 py-3">
-              <CheckCircle size={16} />
-              Phone number verified successfully.
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {verifyStep === 'idle' && (
-                <>
-                  <p className="text-xs text-gray-500">
-                    Enter your mobile number to enable SMS notifications. A verification code will be sent to confirm ownership.
-                  </p>
-                  <div className="flex gap-2">
-                    <input
-                      type="tel"
-                      placeholder="+1 555 000 0000"
-                      value={phoneInput}
-                      onChange={(e) => setPhoneInput(e.target.value)}
-                      className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                    <button
-                      onClick={() => sendCodeMutation.mutate(phoneInput)}
-                      disabled={!phoneInput.trim() || sendCodeMutation.isPending}
-                      className="px-4 py-2 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-1.5"
-                    >
-                      {sendCodeMutation.isPending && <Loader2 size={14} className="animate-spin" />}
-                      Send code
-                    </button>
+          {/* Registered devices */}
+          <div>
+            <div className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Registered Devices</div>
+            {activeDevices.length === 0 ? (
+              <div className="flex items-center gap-3 bg-gray-50 border border-gray-100 rounded-lg px-4 py-3">
+                <Smartphone size={18} className="text-gray-400 flex-shrink-0" />
+                <div>
+                  <div className="text-sm text-gray-600">No devices registered</div>
+                  <div className="text-xs text-gray-400 mt-0.5">
+                    Install the MegaMTX mobile app on iOS or Android, or enable web push from your browser. The app
+                    automatically registers your device on sign-in.
                   </div>
-                </>
-              )}
-
-              {verifyStep === 'sent' && (
-                <>
-                  <div className="flex items-center gap-2 text-sm text-blue-700 bg-blue-50 border border-blue-100 rounded-lg px-4 py-3">
-                    <Phone size={16} className="flex-shrink-0" />
-                    Code sent to <strong>{phoneInput}</strong>. Check your messages.
-                  </div>
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      placeholder="6-digit code"
-                      maxLength={6}
-                      value={codeInput}
-                      onChange={(e) => setCodeInput(e.target.value.replace(/\D/g, ''))}
-                      className="w-40 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 tracking-widest text-center"
-                    />
-                    <button
-                      onClick={() => confirmCodeMutation.mutate(codeInput)}
-                      disabled={codeInput.length !== 6 || confirmCodeMutation.isPending}
-                      className="px-4 py-2 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-1.5"
-                    >
-                      {confirmCodeMutation.isPending && <Loader2 size={14} className="animate-spin" />}
-                      Verify
-                    </button>
-                    <button
-                      onClick={() => { setVerifyStep('idle'); setCodeInput(''); setVerifyError(''); }}
-                      className="px-3 py-2 text-sm text-gray-500 hover:text-gray-700"
-                    >
-                      Back
-                    </button>
-                  </div>
-                </>
-              )}
-
-              {verifyError && (
-                <div className="flex items-center gap-2 text-sm text-red-700 bg-red-50 border border-red-100 rounded-lg px-4 py-3">
-                  <AlertCircle size={16} className="flex-shrink-0" />
-                  {verifyError}
                 </div>
-              )}
-            </div>
-          )}
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {activeDevices.map((device) => (
+                  <div key={device.id} className="flex items-center gap-3 bg-green-50 border border-green-100 rounded-lg px-4 py-2.5">
+                    <CheckCircle size={16} className="text-green-600 flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <span className="text-sm text-green-800 font-medium">{platformLabel[device.platform] ?? device.platform}</span>
+                      <span className="text-xs text-green-600 ml-2">
+                        Last seen {new Date(device.lastSeen).toLocaleDateString()}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
 
-          {/* Per-event SMS toggles (only shown when verified + smsEnabled) */}
-          {isVerified && prefs?.smsEnabled && (
-            <div className="border-t border-gray-100 pt-4 space-y-0 divide-y divide-gray-50">
-              {SMS_SETTINGS.map(({ key, label, description }) => (
+          {/* Per-event push toggles */}
+          {prefs?.pushEnabled && (
+            <div className="border-t border-gray-100 pt-4 divide-y divide-gray-50">
+              {PUSH_SETTINGS.map(({ key, label, description }) => (
                 <div key={key} className="flex items-center justify-between py-3">
                   <div>
                     <div className="text-sm font-medium text-gray-800">{label}</div>
@@ -268,13 +153,14 @@ export default function NotificationSettingsPage() {
       </div>
 
       <div className="bg-blue-50 border border-blue-100 rounded-xl px-5 py-4">
-        <h3 className="text-sm font-semibold text-blue-800 mb-1">SMS Delivery</h3>
-        <p className="text-xs text-blue-600">SMS uses Twilio and requires phone numbers in E.164 format, such as +15558675310. Verification codes and 2FA can build on the same SMS service.</p>
-      </div>
-
-      <div className="bg-blue-50 border border-blue-100 rounded-xl px-5 py-4">
-        <h3 className="text-sm font-semibold text-blue-800 mb-1">Mobile Push Notifications</h3>
-        <p className="text-xs text-blue-600">Push notifications will be available when the MegaMTX mobile app is installed on your iOS or Android device. The app will automatically register your device for push alerts.</p>
+        <div className="flex items-center gap-2 mb-1">
+          <Bell size={14} className="text-blue-600" />
+          <h3 className="text-sm font-semibold text-blue-800">Mobile App</h3>
+        </div>
+        <p className="text-xs text-blue-600">
+          Download the MegaMTX app from the App Store (iOS) or Google Play (Android) to receive instant push
+          notifications. Sign in with your existing credentials — your device registers automatically.
+        </p>
       </div>
     </div>
   );

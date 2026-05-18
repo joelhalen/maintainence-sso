@@ -2,7 +2,7 @@ import { TicketStatus, TicketPriority, TicketType, AuditAction } from '@prisma/c
 import prisma from '../config/database';
 import { getTicketReplyTo } from '../config/email';
 import { sendEmail, ticketCreatedTemplate, ticketAssignedTemplate, ticketStatusChangedTemplate } from './emailService';
-import { sendTicketSmsNotification } from './smsService';
+import { sendTicketPushNotification } from './pushNotificationService';
 import { getTicketVisibilityFilter } from './permissionService';
 import { writeAudit } from './auditService';
 import { AppError } from '../middleware/errorHandler';
@@ -205,10 +205,12 @@ export async function createTicket(
       templateName: 'ticket_assigned',
     }).catch(() => {});
 
-    sendTicketSmsNotification(ticket.assignedTo.id, 'assign', {
+    sendTicketPushNotification(ticket.assignedTo.id, 'assign', {
       ticketNumber: ticket.ticketNumber,
       title: ticket.title,
       url: ticketUrl,
+      ticketId: ticket.id,
+      organizationId: user.organizationId,
     }).catch(() => {});
   }
 
@@ -296,11 +298,13 @@ export async function updateTicketStatus(
       templateName: 'ticket_status_changed',
     }).catch(() => {});
 
-    sendTicketSmsNotification(u.id, 'status', {
+    sendTicketPushNotification(u.id, 'status', {
       ticketNumber: ticket.ticketNumber,
       title: ticket.title,
       url: ticketUrl,
       detail: newStatus.replace(/_/g, ' '),
+      ticketId: ticket.id,
+      organizationId: user.organizationId,
     }).catch(() => {});
   }
 

@@ -8,12 +8,25 @@ import prisma from '../config/database';
 const router = Router();
 router.use(authenticate);
 
+// List active device tokens for the current user
+router.get('/', async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const devices = await prisma.deviceToken.findMany({
+      where: { userId: req.user!.id, organizationId: req.user!.organizationId },
+      orderBy: { lastSeen: 'desc' },
+    });
+    res.json(devices);
+  } catch (e) {
+    next(e);
+  }
+});
+
 // Register or refresh a device push token
 router.post(
   '/',
   [
     body('token').trim().notEmpty(),
-    body('platform').isIn(['IOS', 'ANDROID']),
+    body('platform').isIn(['IOS', 'ANDROID', 'WEB']),
   ],
   async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
     const errors = validationResult(req);

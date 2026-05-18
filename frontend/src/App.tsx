@@ -14,7 +14,7 @@ import ReportsPage from './pages/Reports';
 import NotificationSettingsPage from './pages/NotificationSettings';
 import OrganizationSettingsPage from './pages/OrganizationSettings';
 import EmailSettingsPage from './pages/EmailSettings';
-import SmsSettingsPage from './pages/SmsSettings';
+import PushSettingsPage from './pages/PushSettings';
 import PlatformDashboardPage from './pages/PlatformDashboard';
 import PlatformOrganizationsPage from './pages/PlatformOrganizations';
 import PlatformPlansPage from './pages/PlatformPlans';
@@ -84,7 +84,7 @@ function AppRoutes() {
         <Route path="settings/notifications" element={<NotificationSettingsPage />} />
         <Route path="settings/organization" element={<OrganizationSettingsPage />} />
         <Route path="settings/email" element={<EmailSettingsPage />} />
-        <Route path="settings/sms" element={<SmsSettingsPage />} />
+        <Route path="settings/push" element={<PushSettingsPage />} />
         <Route path="platform" element={<PlatformDashboardPage />} />
         <Route path="platform/organizations" element={<PlatformOrganizationsPage />} />
         <Route path="platform/organizations/:organizationId/roles" element={<PlatformRolesPage />} />

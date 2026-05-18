@@ -3,7 +3,16 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- Mobile-first viewport: prevent auto-zoom on iOS, respect safe areas (notch/home bar) -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <!-- PWA / home screen metadata -->
+    <meta name="application-name" content="MegaMTX" />
+    <meta name="theme-color" content="#1d4ed8" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="MegaMTX" />
+    <link rel="manifest" href="/manifest.json" />
     <title>MegaMTX</title>
   </head>
   <body>
