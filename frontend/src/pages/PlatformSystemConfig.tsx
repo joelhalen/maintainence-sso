@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import type { ElementType } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Save, Check, AlertCircle, AlertTriangle, FileText, Settings2, ToggleLeft, ToggleRight } from 'lucide-react';
 import api from '../api/client';
@@ -16,7 +17,7 @@ interface SystemConfig {
 
 type Tab = 'general' | 'tos' | 'privacy';
 
-const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
+const TABS: { id: Tab; label: string; icon: ElementType }[] = [
   { id: 'general', label: 'General Settings', icon: Settings2 },
   { id: 'tos', label: 'Terms of Service', icon: FileText },
   { id: 'privacy', label: 'Privacy Policy', icon: FileText },

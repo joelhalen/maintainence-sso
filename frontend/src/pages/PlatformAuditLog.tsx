@@ -174,6 +174,61 @@ function ExpandedDetails({ log }: { log: AuditLog }) {
   );
 }
 
+// ─── AuditLogRow ──────────────────────────────────────────────────────────────
+
+function AuditLogRow({
+  log,
+  expanded,
+  onToggle,
+}: {
+  log: AuditLog;
+  expanded: boolean;
+  onToggle: (id: string) => void;
+}) {
+  return (
+    <>
+      <tr
+        onClick={() => onToggle(log.id)}
+        className="hover:bg-gray-50 cursor-pointer transition-colors border-b border-gray-50"
+      >
+        <td className="px-4 py-3 text-gray-500 text-xs whitespace-nowrap">
+          <div className="flex items-center gap-1.5">
+            <ChevronRight
+              size={12}
+              className={`flex-shrink-0 text-gray-400 transition-transform ${
+                expanded ? 'rotate-90' : ''
+              }`}
+            />
+            {formatTimestamp(log.createdAt)}
+          </div>
+        </td>
+        <td className="px-4 py-3">
+          {log.user ? (
+            <>
+              <div className="font-medium text-gray-900">{log.user.name}</div>
+              <div className="text-xs text-gray-400">{log.user.email}</div>
+            </>
+          ) : (
+            <span className="text-xs text-gray-400 italic">System</span>
+          )}
+        </td>
+        <td className="px-4 py-3">
+          <ActionBadge action={log.action} />
+        </td>
+        <td className="px-4 py-3 font-mono text-xs text-gray-600">{log.resource}</td>
+        <td
+          className="px-4 py-3 font-mono text-xs text-gray-500"
+          title={log.resourceId ?? undefined}
+        >
+          {truncateId(log.resourceId)}
+        </td>
+        <td className="px-4 py-3 text-xs text-gray-400 font-mono">{log.ipAddress ?? '—'}</td>
+      </tr>
+      {expanded && <ExpandedDetails log={log} />}
+    </>
+  );
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function PlatformAuditLogPage() {
@@ -293,47 +348,13 @@ export default function PlatformAuditLogPage() {
           <tbody className="divide-y divide-gray-50">
             {isLoading
               ? Array.from({ length: 10 }).map((_, i) => <SkeletonRow key={i} />)
-              : data?.logs.map((log) => (
-                  <>
-                    <tr
-                      key={log.id}
-                      onClick={() => toggleExpanded(log.id)}
-                      className="hover:bg-gray-50 cursor-pointer transition-colors"
-                    >
-                      <td className="px-4 py-3 text-gray-500 text-xs whitespace-nowrap">
-                        <div className="flex items-center gap-1.5">
-                          <ChevronRight
-                            size={12}
-                            className={`flex-shrink-0 text-gray-400 transition-transform ${
-                              expandedId === log.id ? 'rotate-90' : ''
-                            }`}
-                          />
-                          {formatTimestamp(log.createdAt)}
-                        </div>
-                      </td>
-                      <td className="px-4 py-3">
-                        {log.user ? (
-                          <>
-                            <div className="font-medium text-gray-900">{log.user.name}</div>
-                            <div className="text-xs text-gray-400">{log.user.email}</div>
-                          </>
-                        ) : (
-                          <span className="text-xs text-gray-400 italic">System</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3">
-                        <ActionBadge action={log.action} />
-                      </td>
-                      <td className="px-4 py-3 font-mono text-xs text-gray-600">{log.resource}</td>
-                      <td className="px-4 py-3 font-mono text-xs text-gray-500" title={log.resourceId ?? undefined}>
-                        {truncateId(log.resourceId)}
-                      </td>
-                      <td className="px-4 py-3 text-xs text-gray-400 font-mono">
-                        {log.ipAddress ?? '—'}
-                      </td>
-                    </tr>
-                    {expandedId === log.id && <ExpandedDetails key={`${log.id}-detail`} log={log} />}
-                  </>
+              : data?.logs.map((log: AuditLog) => (
+                  <AuditLogRow
+                    key={log.id}
+                    log={log}
+                    expanded={expandedId === log.id}
+                    onToggle={toggleExpanded}
+                  />
                 ))}
 
             {!isLoading && data?.logs.length === 0 && (
