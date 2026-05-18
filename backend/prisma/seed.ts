@@ -1,4 +1,5 @@
 import { Permission, PrismaClient, SubscriptionTier } from '@prisma/client';
+
 import bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
@@ -22,6 +23,7 @@ const SYSTEM_ROLES = [
       Permission.LOCATION_READ, Permission.LOCATION_UPDATE, Permission.ASSET_CREATE,
       Permission.ASSET_READ, Permission.ASSET_UPDATE, Permission.REPORT_VIEW,
       Permission.REPORT_EXPORT, Permission.ADMIN_PANEL, Permission.AUDIT_LOG_VIEW,
+      Permission.GROUP_MANAGE,
     ],
   },
   {

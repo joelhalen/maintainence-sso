@@ -35,6 +35,7 @@ enum Permission {
   ADMIN_PANEL
   AUDIT_LOG_VIEW
   EMAIL_SETTINGS
+  GROUP_MANAGE
 }
 
 enum TicketStatus {
@@ -104,6 +105,23 @@ enum SubscriptionStatus {
   PAST_DUE
   CANCELED
   EXPIRED
+}
+
+// Granular rule actions — separate from the coarse role Permission enum so
+// rules can target specific ticket operations at a location / type scope.
+enum RuleAction {
+  VIEW
+  COMMENT
+  UPDATE_STATUS
+  CLOSE
+  ASSIGN
+  CREATE
+  EXPORT
+}
+
+enum RuleEffect {
+  ALLOW
+  DENY
 }
 
 // ─── Organizations & Subscriptions ────────────────────────────────────────────
@@ -195,24 +213,28 @@ model User {
   department      String?
   phone           String?
   phoneVerifiedAt DateTime?
+  phoneVerified   Boolean      @default(false)
   isPlatformAdmin Boolean      @default(false)
   active          Boolean      @default(true)
   lastLoginAt     DateTime?
   createdAt       DateTime     @default(now())
   updatedAt       DateTime     @updatedAt
 
-  createdTickets   Ticket[]                @relation("TicketCreatedBy")
-  assignedTickets  Ticket[]                @relation("TicketAssignedTo")
-  completedTickets Ticket[]                @relation("TicketCompletedBy")
-  closedTickets    Ticket[]                @relation("TicketClosedBy")
-  comments         TicketComment[]
-  statusHistory    TicketStatusHistory[]
-  auditLogs        AuditLog[]
-  notificationPref NotificationPreference?
-  signatures       ElectronicSignature[]
-  deviceTokens     DeviceToken[]
-  smsLogs          SmsLog[]
-  emailMessages    EmailMessage[]
+  createdTickets    Ticket[]                @relation("TicketCreatedBy")
+  assignedTickets   Ticket[]                @relation("TicketAssignedTo")
+  completedTickets  Ticket[]                @relation("TicketCompletedBy")
+  closedTickets     Ticket[]                @relation("TicketClosedBy")
+  comments          TicketComment[]
+  statusHistory     TicketStatusHistory[]
+  auditLogs         AuditLog[]
+  notificationPref  NotificationPreference?
+  signatures        ElectronicSignature[]
+  deviceTokens      DeviceToken[]
+  smsLogs           SmsLog[]
+  emailMessages     EmailMessage[]
+  groupMemberships  GroupMembership[]
+  permissionRules   PermissionRule[]
+  phoneVerification PhoneVerification?
 
   @@index([email])
   @@index([isPlatformAdmin])
@@ -236,6 +258,71 @@ model Role {
   @@index([organizationId])
 }
 
+// ─── User Groups ──────────────────────────────────────────────────────────────
+
+model Group {
+  id          String            @id @default(cuid())
+  name        String            @unique
+  description String?
+  color       String?           // hex colour for UI badge
+  members     GroupMembership[]
+  rules       PermissionRule[]
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+}
+
+model GroupMembership {
+  id      String   @id @default(cuid())
+  userId  String
+  groupId String
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  group   Group    @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  addedAt DateTime @default(now())
+
+  @@unique([userId, groupId])
+  @@index([userId])
+  @@index([groupId])
+}
+
+// ─── Granular Permission Rules ────────────────────────────────────────────────
+// A rule targets either a User OR a Group (exactly one must be set).
+// Scope is optionally narrowed to a specific Location and/or TicketType.
+// null scope means "applies everywhere / all types".
+// DENY takes precedence over ALLOW when rules conflict.
+
+model PermissionRule {
+  id         String      @id @default(cuid())
+  userId     String?
+  groupId    String?
+  locationId String?
+  ticketType TicketType?
+  action     RuleAction
+  effect     RuleEffect  @default(ALLOW)
+
+  user     User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  group    Group?    @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  location Location? @relation(fields: [locationId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([groupId])
+  @@index([locationId])
+}
+
+// ─── Phone / SMS Verification ─────────────────────────────────────────────────
+
+model PhoneVerification {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  phone     String
+  codeHash  String
+  expiresAt DateTime
+  attempts  Int      @default(0)
+  createdAt DateTime @default(now())
+}
+
 // ─── Locations ────────────────────────────────────────────────────────────────
 
 model Location {
@@ -254,6 +341,8 @@ model Location {
   active         Boolean      @default(true)
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
+
+  permissionRules PermissionRule[]
 
   @@unique([organizationId, code])
   @@index([organizationId])
@@ -456,7 +545,7 @@ model AuditLog {
   @@index([action])
 }
 
-// ─── Email Logs ───────────────────────────────────────────────────────────────
+// ─── Email / SMS Logs ─────────────────────────────────────────────────────────
 
 model EmailLog {
   id             String        @id @default(cuid())
@@ -535,20 +624,6 @@ model EmailAttachment {
   @@index([emailMessageId])
 }
 
-// ─── Notification Preferences ─────────────────────────────────────────────────
-
-model NotificationPreference {
-  id              String  @id @default(cuid())
-  userId          String  @unique
-  user            User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  onAssign        Boolean @default(true)
-  onComment       Boolean @default(true)
-  onStatusChange  Boolean @default(true)
-  onDueDateRemind Boolean @default(true)
-  emailEnabled    Boolean @default(true)
-  smsEnabled      Boolean @default(false)
-}
-
 // ─── SMS Logs ─────────────────────────────────────────────────────────────────
 
 model SmsLog {
@@ -557,11 +632,13 @@ model SmsLog {
   organization      Organization? @relation(fields: [organizationId], references: [id])
   to                String
   body              String
+  templateName      String?
   status            String
   errorMessage      String?
   providerErrorCode String?
   provider          String        @default("twilio")
   providerMessageId String?       @unique
+  messageId         String?
   userId            String?
   user              User?         @relation(fields: [userId], references: [id])
   ticketId          String?
@@ -572,10 +649,30 @@ model SmsLog {
   createdAt         DateTime      @default(now())
 
   @@index([organizationId])
+  @@index([to])
   @@index([userId])
   @@index([ticketId])
   @@index([status])
   @@index([createdAt])
+}
+
+// ─── Notification Preferences ─────────────────────────────────────────────────
+
+model NotificationPreference {
+  id              String  @id @default(cuid())
+  userId          String  @unique
+  user            User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // Email
+  emailEnabled    Boolean @default(true)
+  onAssign        Boolean @default(true)
+  onComment       Boolean @default(true)
+  onStatusChange  Boolean @default(true)
+  onDueDateRemind Boolean @default(true)
+  // SMS
+  smsEnabled      Boolean @default(false)
+  onAssignSms     Boolean @default(false)
+  onStatusSms     Boolean @default(false)
+  onCommentSms    Boolean @default(false)
 }
 
 // ─── Mobile Push Notification Device Tokens ────────────────────────────────────

@@ -2,7 +2,7 @@ import { Outlet, NavLink } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import {
   LayoutDashboard, Ticket, Wrench, MapPin, Users, BarChart3,
-  LogOut, Menu, X, ChevronRight, Bell, CreditCard, Mail, Building2, SlidersHorizontal, MessageSquare
+  LogOut, Menu, X, ChevronRight, Bell, CreditCard, Mail, Building2, SlidersHorizontal, MessageSquare, ShieldCheck
 } from 'lucide-react';
 import { useState } from 'react';
 import clsx from 'clsx';
@@ -23,6 +23,7 @@ const NAV_ITEMS: NavItem[] = [
   { to: '/locations', label: 'Locations', icon: MapPin,                     permission: 'LOCATION_READ' },
   { to: '/users',     label: 'Users',     icon: Users,                      permission: 'USER_READ'     },
   { to: '/reports',   label: 'Reports',   icon: BarChart3,                  permission: 'REPORT_VIEW'   },
+  { to: '/groups',    label: 'Groups',    icon: ShieldCheck,                permission: 'GROUP_MANAGE'  },
 ];
 
 export default function Layout() {

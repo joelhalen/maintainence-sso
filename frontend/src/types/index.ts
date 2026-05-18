@@ -4,7 +4,44 @@ export type Permission =
   | 'USER_CREATE' | 'USER_READ' | 'USER_UPDATE' | 'USER_DELETE' | 'USER_ASSIGN_ROLE'
   | 'LOCATION_CREATE' | 'LOCATION_READ' | 'LOCATION_UPDATE' | 'LOCATION_DELETE'
   | 'ASSET_CREATE' | 'ASSET_READ' | 'ASSET_UPDATE' | 'ASSET_DELETE'
-  | 'REPORT_VIEW' | 'REPORT_EXPORT' | 'ADMIN_PANEL' | 'AUDIT_LOG_VIEW' | 'EMAIL_SETTINGS';
+  | 'REPORT_VIEW' | 'REPORT_EXPORT' | 'ADMIN_PANEL' | 'AUDIT_LOG_VIEW' | 'EMAIL_SETTINGS'
+  | 'GROUP_MANAGE';
+
+export type RuleAction = 'VIEW' | 'COMMENT' | 'UPDATE_STATUS' | 'CLOSE' | 'ASSIGN' | 'CREATE' | 'EXPORT';
+export type RuleEffect = 'ALLOW' | 'DENY';
+export type TicketTypeValue = 'CORRECTIVE' | 'PREVENTIVE' | 'INSPECTION' | 'SAFETY' | 'PROJECT';
+
+export interface PermissionRule {
+  id: string;
+  userId?: string;
+  groupId?: string;
+  locationId?: string;
+  ticketType?: TicketTypeValue;
+  action: RuleAction;
+  effect: RuleEffect;
+  location?: { id: string; name: string };
+  user?: { id: string; name: string; email: string };
+  group?: { id: string; name: string };
+  createdAt: string;
+}
+
+export interface GroupMember {
+  id: string;
+  addedAt: string;
+  user: { id: string; name: string; email: string; role: { name: string }; department?: string; active: boolean };
+}
+
+export interface Group {
+  id: string;
+  name: string;
+  description?: string;
+  color?: string;
+  createdAt: string;
+  updatedAt: string;
+  _count?: { members: number; rules: number };
+  members?: GroupMember[];
+  rules?: PermissionRule[];
+}
 
 export type SubscriptionTier = 'FREE' | 'STARTER' | 'PROFESSIONAL' | 'ENTERPRISE';
 export type SubscriptionStatus = 'TRIALING' | 'ACTIVE' | 'PAST_DUE' | 'CANCELED' | 'EXPIRED';
