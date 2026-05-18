@@ -38,6 +38,7 @@ export const authenticate = async (req: AuthRequest, res: Response, next: NextFu
       permissions: user.role.permissions,
       organizationId: user.organizationId,
       organization: toOrganizationContext(user.organization),
+      isPlatformAdmin: user.isPlatformAdmin,
     } as AuthUser;
 
     req.auditMeta = {

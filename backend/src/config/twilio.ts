@@ -22,6 +22,17 @@ export function getTwilioStatusCallbackUrl(): string | undefined {
   return process.env.TWILIO_STATUS_CALLBACK_URL;
 }
 
+export function getTwilioConfigStatus() {
+  return {
+    configured: isTwilioConfigured(),
+    hasAccountSid: Boolean(process.env.TWILIO_ACCOUNT_SID),
+    hasAuthToken: Boolean(process.env.TWILIO_AUTH_TOKEN),
+    hasFromNumber: Boolean(process.env.TWILIO_FROM_NUMBER),
+    fromNumber: process.env.TWILIO_FROM_NUMBER || '',
+    hasStatusCallbackUrl: Boolean(process.env.TWILIO_STATUS_CALLBACK_URL),
+  };
+}
+
 export function getTwilioClient(): TwilioClient | null {
   if (!isTwilioConfigured()) {
     if (!warned) {

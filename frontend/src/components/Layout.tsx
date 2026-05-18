@@ -2,7 +2,7 @@ import { Outlet, NavLink } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import {
   LayoutDashboard, Ticket, Wrench, MapPin, Users, BarChart3,
-  LogOut, Menu, X, ChevronRight, Bell, CreditCard, Mail
+  LogOut, Menu, X, ChevronRight, Bell, CreditCard, Mail, Building2, SlidersHorizontal, MessageSquare
 } from 'lucide-react';
 import { useState } from 'react';
 import clsx from 'clsx';
@@ -26,7 +26,7 @@ const NAV_ITEMS: NavItem[] = [
 ];
 
 export default function Layout() {
-  const { user, logout, hasPermission } = useAuth();
+  const { user, logout, hasPermission, isPlatformAdmin } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const visibleNavItems = NAV_ITEMS.filter((item) => hasPermission(item.permission));
@@ -54,6 +54,45 @@ export default function Layout() {
         </div>
 
         <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+          {isPlatformAdmin && (
+            <>
+              <div className="px-3 pb-2 text-[11px] font-semibold uppercase tracking-wide text-gray-500">Platform</div>
+              <NavLink
+                to="/platform"
+                onClick={() => setSidebarOpen(false)}
+                className={({ isActive }) => clsx(
+                  'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',
+                  isActive ? 'bg-blue-600 text-white' : 'text-gray-300 hover:bg-gray-800 hover:text-white'
+                )}
+              >
+                <LayoutDashboard size={18} />
+                Platform Dashboard
+              </NavLink>
+              <NavLink
+                to="/platform/organizations"
+                onClick={() => setSidebarOpen(false)}
+                className={({ isActive }) => clsx(
+                  'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',
+                  isActive ? 'bg-blue-600 text-white' : 'text-gray-300 hover:bg-gray-800 hover:text-white'
+                )}
+              >
+                <Building2 size={18} />
+                Organizations
+              </NavLink>
+              <NavLink
+                to="/platform/plans"
+                onClick={() => setSidebarOpen(false)}
+                className={({ isActive }) => clsx(
+                  'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',
+                  isActive ? 'bg-blue-600 text-white' : 'text-gray-300 hover:bg-gray-800 hover:text-white'
+                )}
+              >
+                <SlidersHorizontal size={18} />
+                Plan Controls
+              </NavLink>
+              <div className="px-3 pb-2 pt-4 text-[11px] font-semibold uppercase tracking-wide text-gray-500">Organization</div>
+            </>
+          )}
           {visibleNavItems.map(({ to, label, icon: Icon, end }) => (
             <NavLink
               key={to}
@@ -110,18 +149,32 @@ export default function Layout() {
             </NavLink>
           )}
           {hasPermission('EMAIL_SETTINGS') && (
-            <NavLink
-              to="/settings/email"
-              onClick={() => setSidebarOpen(false)}
-              className={({ isActive }) =>
-                `flex items-center gap-2 w-full px-3 py-2 text-sm rounded-lg transition-colors mb-1 ${
-                  isActive ? 'bg-gray-800 text-white' : 'text-gray-400 hover:text-white hover:bg-gray-800'
-                }`
-              }
-            >
-              <Mail size={16} />
-              Email
-            </NavLink>
+            <>
+              <NavLink
+                to="/settings/email"
+                onClick={() => setSidebarOpen(false)}
+                className={({ isActive }) =>
+                  `flex items-center gap-2 w-full px-3 py-2 text-sm rounded-lg transition-colors mb-1 ${
+                    isActive ? 'bg-gray-800 text-white' : 'text-gray-400 hover:text-white hover:bg-gray-800'
+                  }`
+                }
+              >
+                <Mail size={16} />
+                Email
+              </NavLink>
+              <NavLink
+                to="/settings/sms"
+                onClick={() => setSidebarOpen(false)}
+                className={({ isActive }) =>
+                  `flex items-center gap-2 w-full px-3 py-2 text-sm rounded-lg transition-colors mb-1 ${
+                    isActive ? 'bg-gray-800 text-white' : 'text-gray-400 hover:text-white hover:bg-gray-800'
+                  }`
+                }
+              >
+                <MessageSquare size={16} />
+                SMS
+              </NavLink>
+            </>
           )}
           <button
             onClick={logout}

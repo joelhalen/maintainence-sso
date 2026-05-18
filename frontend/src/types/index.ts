@@ -63,6 +63,7 @@ export interface User {
   id: string;
   email: string;
   name: string;
+  isPlatformAdmin: boolean;
   organizationId: string;
   organization?: OrganizationContext;
   role: { id: string; name: string; permissions: Permission[] };

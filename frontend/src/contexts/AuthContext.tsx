@@ -13,6 +13,7 @@ interface AuthContextValue extends AuthState {
   logout: () => void;
   hasPermission: (permission: Permission) => boolean;
   hasAnyPermission: (...permissions: Permission[]) => boolean;
+  isPlatformAdmin: boolean;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -58,7 +59,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 
   return (
-    <AuthContext.Provider value={{ ...auth, login, logout, hasPermission, hasAnyPermission }}>
+    <AuthContext.Provider value={{ ...auth, login, logout, hasPermission, hasAnyPermission, isPlatformAdmin: auth.user?.isPlatformAdmin ?? false }}>
       {children}
     </AuthContext.Provider>
   );

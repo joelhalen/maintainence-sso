@@ -195,6 +195,7 @@ model User {
   department      String?
   phone           String?
   phoneVerifiedAt DateTime?
+  isPlatformAdmin Boolean      @default(false)
   active          Boolean      @default(true)
   lastLoginAt     DateTime?
   createdAt       DateTime     @default(now())
@@ -214,6 +215,7 @@ model User {
   emailMessages    EmailMessage[]
 
   @@index([email])
+  @@index([isPlatformAdmin])
   @@index([roleId])
   @@index([organizationId])
 }

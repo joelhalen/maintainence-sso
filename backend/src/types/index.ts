@@ -38,6 +38,7 @@ export interface AuthUser {
   permissions: Permission[];
   organizationId: string;
   organization: OrganizationContext;
+  isPlatformAdmin: boolean;
 }
 
 declare global {

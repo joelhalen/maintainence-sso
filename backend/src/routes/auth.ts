@@ -76,6 +76,7 @@ router.post(
         department: user.department,
         phone: user.phone,
         active: user.active,
+        isPlatformAdmin: user.isPlatformAdmin,
         organizationId: user.organizationId,
         organization: toOrganizationContext(user.organization),
         role: {

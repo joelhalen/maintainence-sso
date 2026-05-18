@@ -19,6 +19,8 @@ import exportRouter from './routes/export';
 import webhooksRouter from './routes/webhooks';
 import organizationsRouter from './routes/organizations';
 import adminEmailRouter from './routes/adminEmail';
+import adminSmsRouter from './routes/adminSms';
+import platformRouter from './routes/platform';
 import { errorHandler, notFound } from './middleware/errorHandler';
 import { logger } from './config/logger';
 
@@ -56,6 +58,8 @@ app.use('/api/export', exportRouter);
 app.use('/api/webhooks', webhooksRouter);
 app.use('/api/organizations', organizationsRouter);
 app.use('/api/admin/email', adminEmailRouter);
+app.use('/api/admin/sms', adminSmsRouter);
+app.use('/api/platform', platformRouter);
 
 app.get('/api/health', (_req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }));
 

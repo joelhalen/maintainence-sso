@@ -171,13 +171,14 @@ async function main() {
 
   await prisma.user.upsert({
     where: { email: 'admin@megamtx.local' },
-    update: { organizationId: organization.id, roleId: superAdminRole.id },
+    update: { organizationId: organization.id, roleId: superAdminRole.id, isPlatformAdmin: true },
     create: {
       email: 'admin@megamtx.local',
       name: 'System Administrator',
       passwordHash: await bcrypt.hash('Admin@123!', 12),
       roleId: superAdminRole.id,
       organizationId: organization.id,
+      isPlatformAdmin: true,
       department: 'IT',
       active: true,
     },

@@ -30,3 +30,15 @@ export const requireAnyPermission = (...permissions: Permission[]) =>
     }
     next();
   };
+
+export const requirePlatformAdmin = (req: AuthRequest, _res: Response, next: NextFunction): void => {
+  if (!req.user) {
+    next(new AppError(401, 'Authentication required'));
+    return;
+  }
+  if (!req.user.isPlatformAdmin) {
+    next(new AppError(403, 'Platform administrator access required'));
+    return;
+  }
+  next();
+};

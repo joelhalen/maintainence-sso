@@ -14,6 +14,11 @@ import ReportsPage from './pages/Reports';
 import NotificationSettingsPage from './pages/NotificationSettings';
 import OrganizationSettingsPage from './pages/OrganizationSettings';
 import EmailSettingsPage from './pages/EmailSettings';
+import SmsSettingsPage from './pages/SmsSettings';
+import PlatformDashboardPage from './pages/PlatformDashboard';
+import PlatformOrganizationsPage from './pages/PlatformOrganizations';
+import PlatformPlansPage from './pages/PlatformPlans';
+import PlatformRolesPage from './pages/PlatformRoles';
 
 class ErrorBoundary extends React.Component<
   { children: React.ReactNode },
@@ -57,7 +62,8 @@ function PrivateRoute({ children }: { children: React.ReactNode }) {
 
 /** Renders the analytics dashboard for managers/admins, or the action landing page for everyone else. */
 function HomePage() {
-  const { hasPermission } = useAuth();
+  const { hasPermission, isPlatformAdmin } = useAuth();
+  if (isPlatformAdmin) return <PlatformDashboardPage />;
   return hasPermission('REPORT_VIEW') ? <DashboardPage /> : <LandingPage />;
 }
 
@@ -77,6 +83,11 @@ function AppRoutes() {
         <Route path="settings/notifications" element={<NotificationSettingsPage />} />
         <Route path="settings/organization" element={<OrganizationSettingsPage />} />
         <Route path="settings/email" element={<EmailSettingsPage />} />
+        <Route path="settings/sms" element={<SmsSettingsPage />} />
+        <Route path="platform" element={<PlatformDashboardPage />} />
+        <Route path="platform/organizations" element={<PlatformOrganizationsPage />} />
+        <Route path="platform/organizations/:organizationId/roles" element={<PlatformRolesPage />} />
+        <Route path="platform/plans" element={<PlatformPlansPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

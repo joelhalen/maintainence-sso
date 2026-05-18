@@ -94,6 +94,7 @@ CREATE TABLE "User" (
     "department" TEXT,
     "phone" TEXT,
     "phoneVerifiedAt" TIMESTAMP(3),
+    "isPlatformAdmin" BOOLEAN NOT NULL DEFAULT false,
     "active" BOOLEAN NOT NULL DEFAULT true,
     "lastLoginAt" TIMESTAMP(3),
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -413,6 +414,9 @@ CREATE UNIQUE INDEX "User_ssoId_key" ON "User"("ssoId");
 
 -- CreateIndex
 CREATE INDEX "User_email_idx" ON "User"("email");
+
+-- CreateIndex
+CREATE INDEX "User_isPlatformAdmin_idx" ON "User"("isPlatformAdmin");
 
 -- CreateIndex
 CREATE INDEX "User_roleId_idx" ON "User"("roleId");
