@@ -1,12 +1,14 @@
 import { Router, Response, NextFunction } from 'express';
-import { body, param, validationResult } from 'express-validator';
-import { AuditAction, Permission, SubscriptionStatus, TicketStatus } from '@prisma/client';
+import { body, param, query, validationResult } from 'express-validator';
+import { AuditAction, Permission, Prisma, SubscriptionStatus, TicketStatus } from '@prisma/client';
 import { AuthRequest } from '../types';
 import { authenticate } from '../middleware/auth';
 import { requirePlatformAdmin } from '../middleware/rbac';
 import { AppError } from '../middleware/errorHandler';
 import prisma from '../config/database';
 import { writeAudit } from '../services/auditService';
+import fs from 'fs/promises';
+import path from 'path';
 
 const router = Router();
 router.use(authenticate, requirePlatformAdmin);
@@ -92,6 +94,237 @@ router.get('/organizations', async (_req: AuthRequest, res: Response, next: Next
     next(e);
   }
 });
+
+router.get(
+  '/organizations/:id',
+  [param('id').notEmpty()],
+  async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) { next(new AppError(400, errors.array()[0].msg as string)); return; }
+
+    try {
+      const org = await prisma.organization.findUnique({
+        where: { id: req.params.id },
+        include: {
+          subscription: { include: { plan: true } },
+          users: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              active: true,
+              isPlatformAdmin: true,
+              createdAt: true,
+              role: { select: { name: true } },
+            },
+          },
+          roles: {
+            select: {
+              id: true,
+              name: true,
+              description: true,
+              permissions: true,
+            },
+          },
+          _count: {
+            select: { users: true, locations: true, assets: true, tickets: true },
+          },
+        },
+      });
+
+      if (!org) {
+        next(new AppError(404, 'Organization not found'));
+        return;
+      }
+
+      const [activeTicketCount, recentTickets] = await Promise.all([
+        prisma.ticket.count({
+          where: { organizationId: org.id, status: { in: ACTIVE_TICKET_STATUSES } },
+        }),
+        prisma.ticket.findMany({
+          where: { organizationId: org.id },
+          orderBy: { createdAt: 'desc' },
+          take: 10,
+          select: {
+            id: true,
+            ticketNumber: true,
+            title: true,
+            status: true,
+            priority: true,
+            createdAt: true,
+          },
+        }),
+      ]);
+
+      res.json({ ...org, activeTicketCount, recentTickets });
+    } catch (e) {
+      next(e);
+    }
+  }
+);
+
+router.post(
+  '/organizations',
+  [
+    body('name').trim().notEmpty(),
+    body('slug').optional().trim(),
+    body('planId').notEmpty(),
+  ],
+  async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) { next(new AppError(400, errors.array()[0].msg as string)); return; }
+
+    try {
+      const { name, planId } = req.body as { name: string; slug?: string; planId: string };
+
+      const slug: string = req.body.slug
+        ? (req.body.slug as string).trim()
+        : name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+
+      const existing = await prisma.organization.findUnique({ where: { slug } });
+      if (existing) {
+        next(new AppError(409, 'An organization with this slug already exists'));
+        return;
+      }
+
+      const plan = await prisma.subscriptionPlan.findUnique({ where: { id: planId } });
+      if (!plan) {
+        next(new AppError(400, 'Subscription plan not found'));
+        return;
+      }
+
+      const created = await prisma.$transaction(async (tx) => {
+        const org = await tx.organization.create({
+          data: { name, slug },
+        });
+
+        await tx.organizationSubscription.create({
+          data: {
+            organizationId: org.id,
+            planId: plan.id,
+            status: 'ACTIVE',
+          },
+        });
+
+        await tx.role.createMany({
+          data: [
+            {
+              organizationId: org.id,
+              name: 'Super Admin',
+              description: 'Full system access',
+              isSystem: true,
+              permissions: Object.values(Permission),
+            },
+            {
+              organizationId: org.id,
+              name: 'Admin',
+              description: 'Administrative access without system settings',
+              isSystem: true,
+              permissions: [
+                Permission.TICKET_CREATE,
+                Permission.TICKET_READ,
+                Permission.TICKET_UPDATE,
+                Permission.TICKET_DELETE,
+                Permission.TICKET_ASSIGN,
+                Permission.TICKET_CLOSE,
+                Permission.TICKET_EXPORT,
+                Permission.USER_CREATE,
+                Permission.USER_READ,
+                Permission.USER_UPDATE,
+                Permission.USER_ASSIGN_ROLE,
+                Permission.LOCATION_CREATE,
+                Permission.LOCATION_READ,
+                Permission.LOCATION_UPDATE,
+                Permission.ASSET_CREATE,
+                Permission.ASSET_READ,
+                Permission.ASSET_UPDATE,
+                Permission.REPORT_VIEW,
+                Permission.REPORT_EXPORT,
+                Permission.ADMIN_PANEL,
+                Permission.AUDIT_LOG_VIEW,
+                Permission.GROUP_MANAGE,
+              ],
+            },
+            {
+              organizationId: org.id,
+              name: 'Supervisor',
+              description: 'Can manage tickets and assign technicians',
+              isSystem: true,
+              permissions: [
+                Permission.TICKET_CREATE,
+                Permission.TICKET_READ,
+                Permission.TICKET_UPDATE,
+                Permission.TICKET_ASSIGN,
+                Permission.TICKET_CLOSE,
+                Permission.TICKET_EXPORT,
+                Permission.USER_READ,
+                Permission.LOCATION_READ,
+                Permission.ASSET_READ,
+                Permission.ASSET_UPDATE,
+                Permission.REPORT_VIEW,
+                Permission.REPORT_EXPORT,
+              ],
+            },
+            {
+              organizationId: org.id,
+              name: 'Technician',
+              description: 'Can work on assigned tickets',
+              isSystem: true,
+              permissions: [
+                Permission.TICKET_CREATE,
+                Permission.TICKET_READ,
+                Permission.TICKET_UPDATE,
+                Permission.LOCATION_READ,
+                Permission.ASSET_READ,
+              ],
+            },
+            {
+              organizationId: org.id,
+              name: 'Operator',
+              description: 'Can create and view tickets',
+              isSystem: true,
+              permissions: [
+                Permission.TICKET_CREATE,
+                Permission.TICKET_READ,
+                Permission.LOCATION_READ,
+                Permission.ASSET_READ,
+              ],
+            },
+            {
+              organizationId: org.id,
+              name: 'Viewer',
+              description: 'Read-only access',
+              isSystem: true,
+              permissions: [
+                Permission.TICKET_READ,
+                Permission.LOCATION_READ,
+                Permission.ASSET_READ,
+              ],
+            },
+          ],
+        });
+
+        return tx.organization.findUnique({
+          where: { id: org.id },
+          include: { subscription: { include: { plan: true } } },
+        });
+      });
+
+      await writeAudit({
+        userId: req.user!.id,
+        action: AuditAction.CREATE,
+        resource: 'platform_organizations',
+        resourceId: created!.id,
+        newValues: { name, slug, planId },
+        ...req.auditMeta,
+      });
+
+      res.status(201).json(created);
+    } catch (e) {
+      next(e);
+    }
+  }
+);
 
 router.patch(
   '/organizations/:id',
@@ -266,6 +499,128 @@ router.patch(
         newValues: { permissions: updated.permissions },
         ...req.auditMeta,
       });
+      res.json(updated);
+    } catch (e) {
+      next(e);
+    }
+  }
+);
+
+router.get(
+  '/audit',
+  [
+    query('page').optional().isInt({ min: 1 }).toInt(),
+    query('limit').optional().isInt({ min: 1, max: 100 }).toInt(),
+    query('action').optional().isIn(Object.values(AuditAction)),
+    query('resource').optional().isString(),
+    query('userId').optional().isString(),
+  ],
+  async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) { next(new AppError(400, errors.array()[0].msg as string)); return; }
+
+    try {
+      const page = (req.query.page as unknown as number) || 1;
+      const limit = Math.min((req.query.limit as unknown as number) || 50, 100);
+      const skip = (page - 1) * limit;
+
+      const where: Prisma.AuditLogWhereInput = {};
+      if (req.query.action) where.action = req.query.action as AuditAction;
+      if (req.query.resource) where.resource = { contains: req.query.resource as string };
+      if (req.query.userId) where.userId = req.query.userId as string;
+
+      const [logs, total] = await Promise.all([
+        prisma.auditLog.findMany({
+          where,
+          orderBy: { createdAt: 'desc' },
+          skip,
+          take: limit,
+          include: {
+            user: { select: { id: true, name: true, email: true } },
+          },
+        }),
+        prisma.auditLog.count({ where }),
+      ]);
+
+      res.json({
+        logs,
+        total,
+        page,
+        pages: Math.ceil(total / limit),
+      });
+    } catch (e) {
+      next(e);
+    }
+  }
+);
+
+const SYSTEM_CONFIG_PATH = path.join(process.cwd(), 'data', 'system-config.json');
+
+interface SystemConfig {
+  tos: string;
+  privacyPolicy: string;
+  maintenanceMode: boolean;
+  platformName: string;
+}
+
+const DEFAULT_SYSTEM_CONFIG: SystemConfig = {
+  tos: '',
+  privacyPolicy: '',
+  maintenanceMode: false,
+  platformName: 'MegaMTX',
+};
+
+async function readSystemConfig(): Promise<SystemConfig> {
+  try {
+    const raw = await fs.readFile(SYSTEM_CONFIG_PATH, 'utf-8');
+    return { ...DEFAULT_SYSTEM_CONFIG, ...JSON.parse(raw) } as SystemConfig;
+  } catch {
+    return { ...DEFAULT_SYSTEM_CONFIG };
+  }
+}
+
+router.get('/system-config', async (_req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const config = await readSystemConfig();
+    res.json(config);
+  } catch (e) {
+    next(e);
+  }
+});
+
+router.patch(
+  '/system-config',
+  [
+    body('tos').optional().isString(),
+    body('privacyPolicy').optional().isString(),
+    body('maintenanceMode').optional().isBoolean(),
+    body('platformName').optional().isString(),
+  ],
+  async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) { next(new AppError(400, errors.array()[0].msg as string)); return; }
+
+    try {
+      const existing = await readSystemConfig();
+      const updated: SystemConfig = { ...existing };
+
+      if (req.body.tos !== undefined) updated.tos = req.body.tos as string;
+      if (req.body.privacyPolicy !== undefined) updated.privacyPolicy = req.body.privacyPolicy as string;
+      if (req.body.maintenanceMode !== undefined) updated.maintenanceMode = req.body.maintenanceMode as boolean;
+      if (req.body.platformName !== undefined) updated.platformName = req.body.platformName as string;
+
+      await fs.mkdir(path.dirname(SYSTEM_CONFIG_PATH), { recursive: true });
+      await fs.writeFile(SYSTEM_CONFIG_PATH, JSON.stringify(updated, null, 2), 'utf-8');
+
+      await writeAudit({
+        userId: req.user!.id,
+        action: AuditAction.UPDATE,
+        resource: 'system_config',
+        resourceId: 'global',
+        newValues: req.body,
+        ...req.auditMeta,
+      });
+
       res.json(updated);
     } catch (e) {
       next(e);

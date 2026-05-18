@@ -2,6 +2,7 @@ import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import Layout from './components/Layout';
+import AdminLayout from './components/AdminLayout';
 import LoginPage from './pages/Login';
 import LandingPage from './pages/Landing';
 import DashboardPage from './pages/Dashboard';
@@ -19,6 +20,9 @@ import PlatformDashboardPage from './pages/PlatformDashboard';
 import PlatformOrganizationsPage from './pages/PlatformOrganizations';
 import PlatformPlansPage from './pages/PlatformPlans';
 import PlatformRolesPage from './pages/PlatformRoles';
+import PlatformOrgDetailPage from './pages/PlatformOrgDetail';
+import PlatformAuditLogPage from './pages/PlatformAuditLog';
+import PlatformSystemConfigPage from './pages/PlatformSystemConfig';
 import GroupsPage from './pages/Groups';
 
 class ErrorBoundary extends React.Component<
@@ -64,7 +68,7 @@ function PrivateRoute({ children }: { children: React.ReactNode }) {
 /** Renders the analytics dashboard for managers/admins, or the action landing page for everyone else. */
 function HomePage() {
   const { hasPermission, isPlatformAdmin } = useAuth();
-  if (isPlatformAdmin) return <PlatformDashboardPage />;
+  if (isPlatformAdmin) return <Navigate to="/platform" replace />;
   return hasPermission('REPORT_VIEW') ? <DashboardPage /> : <LandingPage />;
 }
 
@@ -85,11 +89,16 @@ function AppRoutes() {
         <Route path="settings/organization" element={<OrganizationSettingsPage />} />
         <Route path="settings/email" element={<EmailSettingsPage />} />
         <Route path="settings/sms" element={<SmsSettingsPage />} />
-        <Route path="platform" element={<PlatformDashboardPage />} />
-        <Route path="platform/organizations" element={<PlatformOrganizationsPage />} />
-        <Route path="platform/organizations/:organizationId/roles" element={<PlatformRolesPage />} />
-        <Route path="platform/plans" element={<PlatformPlansPage />} />
         <Route path="groups" element={<GroupsPage />} />
+      </Route>
+      <Route path="/platform" element={<PrivateRoute><AdminLayout /></PrivateRoute>}>
+        <Route index element={<PlatformDashboardPage />} />
+        <Route path="organizations" element={<PlatformOrganizationsPage />} />
+        <Route path="organizations/:id" element={<PlatformOrgDetailPage />} />
+        <Route path="organizations/:organizationId/roles" element={<PlatformRolesPage />} />
+        <Route path="plans" element={<PlatformPlansPage />} />
+        <Route path="audit" element={<PlatformAuditLogPage />} />
+        <Route path="system-config" element={<PlatformSystemConfigPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
