@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Users, Shield, Pencil, Trash2, X, ChevronRight, UserPlus, ShieldPlus } from 'lucide-react';
+import { Plus, Users, Shield, Trash2, X, ChevronRight, UserPlus, ShieldPlus } from 'lucide-react';
 import api from '../api/client';
 import { Group, GroupMember, PermissionRule, RuleAction, RuleEffect, TicketTypeValue, Location } from '../types';
 
