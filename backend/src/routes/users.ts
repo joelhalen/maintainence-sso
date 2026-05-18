@@ -32,7 +32,6 @@ router.post(
     body('name').trim().notEmpty(),
     body('roleId').notEmpty(),
     body('password').optional().isLength({ min: 8 }),
-    body('phone').optional({ nullable: true, checkFalsy: true }).matches(/^\+[1-9]\d{7,14}$/).withMessage('Phone must be in E.164 format, e.g. +15558675310'),
   ],
   async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
     const errors = validationResult(req);
@@ -52,7 +51,6 @@ router.post(
           roleId: req.body.roleId,
           organizationId: req.user!.organizationId,
           department: req.body.department,
-          phone: req.body.phone,
           passwordHash,
           notificationPref: { create: {} },
         },
@@ -73,14 +71,17 @@ router.patch(
     body('onStatusChange').optional().isBoolean(),
     body('onDueDateRemind').optional().isBoolean(),
     body('emailEnabled').optional().isBoolean(),
-    body('smsEnabled').optional().isBoolean(),
+    body('pushEnabled').optional().isBoolean(),
+    body('onAssignPush').optional().isBoolean(),
+    body('onStatusPush').optional().isBoolean(),
+    body('onCommentPush').optional().isBoolean(),
   ],
   async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) { next(new AppError(400, errors.array()[0].msg as string)); return; }
 
     try {
-      const allowed = ['onAssign', 'onComment', 'onStatusChange', 'onDueDateRemind', 'emailEnabled', 'smsEnabled'];
+      const allowed = ['onAssign', 'onComment', 'onStatusChange', 'onDueDateRemind', 'emailEnabled', 'pushEnabled', 'onAssignPush', 'onStatusPush', 'onCommentPush'];
       const data: Record<string, boolean> = {};
       for (const key of allowed) {
         if (req.body[key] !== undefined) data[key] = req.body[key] === true || req.body[key] === 'true';
@@ -109,21 +110,15 @@ router.patch(
 router.patch(
   '/:id',
   requirePermission(Permission.USER_UPDATE),
-  [
-    body('phone').optional({ nullable: true, checkFalsy: true }).matches(/^\+[1-9]\d{7,14}$/).withMessage('Phone must be in E.164 format, e.g. +15558675310'),
-  ],
+  [],
   async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) { next(new AppError(400, errors.array()[0].msg as string)); return; }
-
     try {
       const old = await prisma.user.findFirst({ where: { id: req.params.id, organizationId: req.user!.organizationId } });
       if (!old) { next(new AppError(404, 'User not found')); return; }
 
       const data: Record<string, unknown> = {};
-      const allowed = ['name', 'department', 'phone', 'active', 'roleId'];
+      const allowed = ['name', 'department', 'active', 'roleId'];
       for (const k of allowed) { if (req.body[k] !== undefined) data[k] = req.body[k]; }
-      if (data.phone !== undefined && data.phone !== old.phone) data.phoneVerifiedAt = null;
 
       if (data.roleId) {
         const role = await prisma.role.findFirst({ where: { id: String(data.roleId), organizationId: req.user!.organizationId } });
@@ -142,7 +137,7 @@ router.patch(
         action: AuditAction.UPDATE,
         resource: 'users',
         resourceId: user.id,
-        oldValues: { name: old.name, department: old.department, phone: old.phone, active: old.active, roleId: old.roleId },
+        oldValues: { name: old.name, department: old.department, active: old.active, roleId: old.roleId },
         newValues: data,
         ...req.auditMeta,
       });

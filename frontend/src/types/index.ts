@@ -51,7 +51,7 @@ export interface SubscriptionLimits {
   maxLocations: number | null;
   maxAssets: number | null;
   maxActiveTickets: number | null;
-  allowSms: boolean;
+  allowPush: boolean;
   allowSso: boolean;
   allowExports: boolean;
 }
@@ -105,8 +105,6 @@ export interface User {
   organization?: OrganizationContext;
   role: { id: string; name: string; permissions: Permission[] };
   department?: string;
-  phone?: string;
-  phoneVerifiedAt?: string;
   active: boolean;
   lastLoginAt?: string;
 }

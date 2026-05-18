@@ -1,8 +1,8 @@
 # MegaMTX — Application Design Reference
 
-**Version:** 1.0  
+**Version:** 1.1  
 **Status:** Living Document  
-**Last Updated:** 2026-05-13  
+**Last Updated:** 2026-05-18  
 **Authors:** Engineering Team
 
 ---
@@ -488,43 +488,46 @@ Seeded tiers are `FREE`, `STARTER`, `PROFESSIONAL`, and `ENTERPRISE`. Nullable n
 | `sizeBytes` | Int | Not null | |
 | `path` | String | Not null | Relative upload path |
 
-### SmsLog
+### PushLog
 
-**Purpose:** Records every outbound SMS send attempt for notification, verification, and troubleshooting purposes. Each send is written before calling Twilio, then updated with the provider message ID, Twilio callback status, delivery timestamp, or failure reason.
+**Purpose:** Records every outbound push notification send attempt for each device token. Written once per device per notification event. Each record captures the FCM response, any error, and links to the user and ticket for traceability.
 
 | Field | Type | Constraints | Notes |
 |---|---|---|---|
 | `id` | String (cuid) | PK | |
-| `to` | String | Not null | E.164 recipient phone number |
-| `body` | String | Not null | SMS text body sent to Twilio |
-| `status` | String | Not null | PENDING, QUEUED, SENT, FAILED, SKIPPED, or provider status |
-| `errorMessage` | String? | Nullable | Twilio or validation error if not sent |
-| `providerErrorCode` | String? | Nullable | Twilio callback error code for failed / undelivered messages |
-| `provider` | String | Default `twilio` | SMS provider identifier |
-| `providerMessageId` | String? | Unique, nullable | Twilio Message SID |
-| `userId` | String? | FK → User, nullable | Recipient user when applicable |
-| `ticketId` | String? | FK → Ticket, nullable | Related ticket when applicable |
-| `sentAt` | DateTime? | Nullable | Set after Twilio accepts the message |
-| `deliveredAt` | DateTime? | Nullable | Set when Twilio reports DELIVERED |
-| `statusCallbackAt` | DateTime? | Nullable | Last delivery-status callback received from Twilio |
+| `organizationId` | String? | FK → Organization, nullable | Tenant scope |
+| `userId` | String? | FK → User, nullable | Recipient user |
+| `ticketId` | String? | FK → Ticket, nullable | Related ticket if applicable |
+| `deviceTokenId` | String? | Nullable | The `DeviceToken.id` this was sent to |
+| `templateName` | String? | Nullable | Template identifier (e.g., `ticket_assign`, `ticket_status`) |
+| `title` | String | Not null | Push notification title |
+| `body` | String | Not null | Push notification body |
+| `status` | String | Not null | SENT, FAILED, or SKIPPED (when FCM is not configured) |
+| `errorMessage` | String? | Nullable | FCM or SDK error message if failed |
+| `provider` | String | Default `fcm` | Push provider identifier |
+| `providerMessageId` | String? | Nullable | FCM message ID returned on success |
+| `sentAt` | DateTime? | Nullable | Timestamp of successful FCM acceptance |
 | `createdAt` | DateTime | Auto | |
 
-**Indexes:** `userId`, `ticketId`, `status`, `createdAt`.
+**Indexes:** `organizationId`, `userId`, `ticketId`, `status`, `createdAt`.
 
 ### NotificationPreference
 
-**Purpose:** Per-user opt-in/out settings for each notification event type and delivery channel. Event toggles are shared across enabled channels, while channel master switches control email and SMS independently.
+**Purpose:** Per-user opt-in/out settings for each notification event type and delivery channel. Email and push channels have independent master switches. Event-level toggles apply per channel.
 
 | Field | Type | Default | Notes |
 |---|---|---|---|
 | `id` | String (cuid) | PK | |
 | `userId` | String | Unique FK → User | One record per user |
-| `onAssign` | Boolean | true | Notify when a ticket is assigned to this user |
-| `onComment` | Boolean | true | Notify when a comment is added to a ticket they're involved in |
-| `onStatusChange` | Boolean | true | Notify when status changes on a relevant ticket |
-| `onDueDateRemind` | Boolean | true | Notify when a ticket's due date is approaching |
+| `onAssign` | Boolean | true | Email when a ticket is assigned to this user |
+| `onComment` | Boolean | true | Email when a comment is added to a ticket they're involved in |
+| `onStatusChange` | Boolean | true | Email when status changes on a relevant ticket |
+| `onDueDateRemind` | Boolean | true | Email when a ticket's due date is approaching |
 | `emailEnabled` | Boolean | true | Master switch — disables all email for this user |
-| `smsEnabled` | Boolean | false | Master switch — enables SMS for this user when a valid phone number exists |
+| `pushEnabled` | Boolean | false | Master switch — enables push for this user (requires at least one registered device) |
+| `onAssignPush` | Boolean | true | Push when a ticket is assigned to this user |
+| `onStatusPush` | Boolean | true | Push when ticket status changes |
+| `onCommentPush` | Boolean | true | Push when a new comment is posted |
 
 ---
 
@@ -764,20 +767,36 @@ Ticket reply threading uses these matching rules:
 
 When a message matches a ticket, the inbound service creates a public `TicketComment` and writes an audit entry. If the sender email matches a user in the organization, that user is used as the comment author; otherwise, a disabled organization-scoped `Inbound Email` system user is created and used. Unmatched inbound mail can be stored against `DEFAULT_ORGANIZATION_ID` for super-admin review.
 
-### Outbound SMS Architecture
+### Push Notification Architecture
 
-Outbound SMS is sent through **Twilio** using `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, and `TWILIO_FROM_NUMBER`. Recipient user phone numbers must be stored in E.164 format, such as `+15558675310`. When `TWILIO_STATUS_CALLBACK_URL` is configured, every outbound message includes a Twilio delivery-status callback URL.
+Push notifications are delivered via **Firebase Cloud Messaging (FCM)**, which covers iOS (via APNs gateway), Android, and web clients. There is no longer a Twilio/SMS dependency; all real-time notification delivery goes through FCM.
 
-The `sendSms()` function in `smsService.ts` follows the same write-first pattern as email:
-1. Create an `SmsLog` record before attempting delivery.
-2. Skip the send if Twilio is not configured or the recipient number is invalid.
-3. Attempt the Twilio API call.
-4. Update the `SmsLog` record with the Twilio Message SID and provider status on success, or `FAILED` / `SKIPPED` with an error message otherwise.
-5. Receive Twilio delivery callbacks at `POST /api/webhooks/twilio/sms-status`.
-6. Validate the `X-Twilio-Signature` header before trusting the callback.
-7. Update `SmsLog.status`, `statusCallbackAt`, `deliveredAt`, and provider error fields from the callback payload.
+**Configuration (Firebase Admin SDK):**
 
-SMS sends are fire-and-forget from ticket services so that Twilio outages never block ticket creation or status changes. SMS is opt-in per user via `NotificationPreference.smsEnabled`; unlike email, SMS defaults off to avoid unexpected carrier costs and compliance issues.
+The backend uses `firebase-admin` initialized with a service account. Credentials are supplied via environment variables — either the three individual fields (`FIREBASE_PROJECT_ID`, `FIREBASE_PRIVATE_KEY`, `FIREBASE_CLIENT_EMAIL`) or a full service account JSON blob (`FIREBASE_SERVICE_ACCOUNT_JSON`). When no credentials are set the service initializes in degraded mode: push log records are written with status `SKIPPED` but no exception is thrown and no operation is blocked.
+
+**Send flow (per device token):**
+
+1. `sendTicketPushNotification()` in `pushNotificationService.ts` is called from `ticketService.ts` on ticket assignment and status change, fire-and-forget.
+2. Notification preferences are checked: if `pushEnabled` is false, or the event-specific toggle is off, the function returns without sending.
+3. Active `DeviceToken` records for the user are fetched.
+4. For each token, `getMessaging(app).send()` is called with the notification title, body, deep-link data, and platform-specific hints (APNs badge/sound, Android sound).
+5. A `PushLog` record is written on success (`SENT`) or failure (`FAILED`). FAILED tokens that return `registration-token-not-registered` or `invalid-argument` are immediately deactivated to prevent future sends to stale tokens.
+6. Push notifications do not require inbound webhooks — FCM handles delivery receipts internally.
+
+**Device token registration:**
+
+Mobile and web clients call `POST /api/devices` with `{ token, platform }` after receiving a device token from the platform SDK (APNs / FCM JS SDK). The backend upserts the `DeviceToken` record associated with the authenticated user. On logout from a native app the client calls `DELETE /api/devices/:token` to deactivate the token.
+
+**Platforms supported:**
+
+| Platform | Token Source | Enum value |
+|---|---|---|
+| iOS | APNs registration via `@capacitor/push-notifications` | `IOS` |
+| Android | FCM registration via `@capacitor/push-notifications` | `ANDROID` |
+| Web | FCM Web SDK (service worker) | `WEB` |
+
+Push is opt-in per user via `NotificationPreference.pushEnabled`; defaults off. Individual event toggles (`onAssignPush`, `onStatusPush`, `onCommentPush`) default on once the master switch is enabled.
 
 ### Email Templates
 
@@ -793,21 +812,9 @@ Templates use inline CSS for email client compatibility. Priority badges are col
 
 ### Notification Preferences
 
-Each user has a `NotificationPreference` record controlling which event types trigger messages for them. `emailEnabled` and `smsEnabled` are channel-level master switches. Individual event toggles (`onAssign`, `onComment`, `onStatusChange`, `onDueDateRemind`) apply to every enabled channel.
+Each user has a `NotificationPreference` record controlling which event types trigger messages for them. `emailEnabled` and `pushEnabled` are channel-level master switches. Individual event toggles apply per channel.
 
-Email defaults on when a preference record is missing. SMS defaults off and requires both `smsEnabled=true` and a valid user phone number.
-
-### Future: Push Notifications
-
-For mobile clients, push notifications will be delivered via:
-- **APNs** (Apple Push Notification service) for iOS devices.
-- **FCM** (Firebase Cloud Messaging) for Android devices.
-
-The plan:
-1. Mobile apps register a device token on login via `POST /api/devices` (endpoint reserved, not yet implemented).
-2. Device tokens are stored against the user in a `DeviceToken` table (Phase 2 model).
-3. The notification service sends both email and push for each event, respecting `NotificationPreference`.
-4. Push payload mirrors email content: ticket number, title, status, and a deep link to the ticket.
+Email defaults on when a preference record is missing. Push defaults off and requires the user to have at least one active `DeviceToken` (registered via the mobile app or web push).
 
 ### Future: In-App Notification Center
 
@@ -1069,14 +1076,39 @@ Mobile apps upload photos (e.g., defect photos taken in the field) via `multipar
 **QR / barcode scanning:**
 The native camera is used to scan asset tags. The scanned value is sent to `GET /api/assets?assetTag=<value>`. The returned asset pre-fills the asset field on the ticket creation form, and its linked location pre-fills the location field. This eliminates manual data entry in the field.
 
-### React Native vs Native
+### Capacitor — Web-to-Native Strategy
 
-The recommendation is **native per platform** (Swift/SwiftUI for iOS, Kotlin/Jetpack Compose for Android) rather than React Native or Flutter, for the following reasons:
-- Maintenance workflows involve camera access, offline sync, barcode scanning, and push notifications — all areas where native integration is more reliable and performant.
-- Platform-specific UX conventions (iOS navigation patterns vs. Android Material Design) matter for field workers who use these patterns daily.
-- The maintenance technician's primary tool is their phone; a suboptimal native experience directly impacts work execution speed.
+MegaMTX uses **Capacitor 6** to wrap the existing React/Vite frontend into native iOS and Android apps, rather than maintaining a separate React Native or fully native codebase. This approach was chosen because:
 
-React Native remains a valid alternative if team capacity is insufficient to maintain two native codebases simultaneously.
+- The web frontend already uses responsive Tailwind layouts and mobile-friendly interaction patterns.
+- Capacitor provides native push notifications (`@capacitor/push-notifications`), safe-area padding, status bar control, and access to native SDKs while sharing 100% of the web UI code.
+- A single TypeScript codebase reduces maintenance overhead and ensures feature parity across web, iOS, and Android with each release.
+
+**Capacitor plugins in use:**
+
+| Plugin | Purpose |
+|---|---|
+| `@capacitor/push-notifications` | FCM/APNs device token registration and foreground notification display |
+| `@capacitor/status-bar` | Match the status bar style to the app's dark header theme |
+
+**Build targets:**
+
+- **Web**: Standard Vite build, served by Express in production. `CAPACITOR_BUILD` env var not set.
+- **iOS**: `npm run build && npx cap sync ios && npx cap open ios` — opens Xcode with the generated project.
+- **Android**: `npm run build && npx cap sync android && npx cap open android` — opens Android Studio.
+
+**Push registration flow (native):**
+
+1. User signs in via JWT auth (same as web).
+2. `registerDeviceWithBackend()` in `src/lib/pushBridge.ts` calls `PushNotifications.requestPermissions()`.
+3. On grant, `PushNotifications.register()` triggers platform registration with APNs or FCM.
+4. The `registration` event returns the device token.
+5. The bridge calls `POST /api/devices` with `{ token, platform }` to register the token with the backend.
+6. On sign-out, `DELETE /api/devices/:token` deactivates the token.
+
+**Native vs React Native trade-off:**
+
+Full native (Swift/SwiftUI, Kotlin/Jetpack Compose) remains superior for long-term offline-first apps with complex camera/barcode workflows. If team capacity grows to support two native codebases, the backend API is already designed to serve them with no changes. Capacitor is the pragmatic bridge to get to app stores now.
 
 ### Shared Types
 
@@ -1209,10 +1241,10 @@ Cloud billing is modeled through `SubscriptionPlan` and `OrganizationSubscriptio
 | `IMAP_POLL_INTERVAL_SECONDS` | Background polling interval | `60` |
 | `IMAP_MAX_MESSAGES_PER_POLL` | Recent messages inspected per poll | `50` |
 | `DEFAULT_ORGANIZATION_ID` | Fallback organization for unmatched inbound mail | Organization cuid |
-| `TWILIO_ACCOUNT_SID` | Twilio account identifier | `ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx` |
-| `TWILIO_AUTH_TOKEN` | Twilio API auth token | _(secret)_ |
-| `TWILIO_FROM_NUMBER` | Twilio sender phone number in E.164 format | `+15017122661` |
-| `TWILIO_STATUS_CALLBACK_URL` | Public webhook URL for Twilio SMS delivery callbacks | `https://maintenance.company.com/api/webhooks/twilio/sms-status` |
+| `FIREBASE_PROJECT_ID` | Firebase project ID for FCM push notifications | `my-firebase-project` |
+| `FIREBASE_PRIVATE_KEY` | Firebase service account private key (PEM, `\n`-escaped) | _(secret)_ |
+| `FIREBASE_CLIENT_EMAIL` | Firebase service account client email | `firebase-adminsdk@project.iam.gserviceaccount.com` |
+| `FIREBASE_SERVICE_ACCOUNT_JSON` | Full service account JSON (alternative to the three fields above) | _(JSON string)_ |
 | `PAYPAL_CLIENT_ID` | PayPal app client ID for future billing integration | _(provider-specific)_ |
 | `PAYPAL_CLIENT_SECRET` | PayPal app secret for future billing integration | _(secret)_ |
 | `PAYPAL_WEBHOOK_ID` | PayPal webhook verification ID for future subscription events | _(provider-specific)_ |
@@ -1234,7 +1266,7 @@ Cloud billing is modeled through `SubscriptionPlan` and `OrganizationSubscriptio
 | Audit logs (PostgreSQL `AuditLog` table) | 365 days minimum | Database; archive to write-once storage for long-term |
 | Email logs (PostgreSQL `EmailLog` table) | 90 days | Database; older records can be archived or pruned |
 | Email messages (PostgreSQL `EmailMessage` table) | 90 days default | Database metadata/body; attachments in upload storage |
-| SMS logs (PostgreSQL `SmsLog` table) | 90 days | Database; older records can be archived or pruned |
+| Push logs (PostgreSQL `PushLog` table) | 90 days | Database; older records can be archived or pruned |
 
 The 365-day minimum audit log retention satisfies FDA 21 CFR Part 11 and typical cGMP record-keeping requirements. Organizations with longer required retention periods (e.g., 3 or 7 years) should archive `AuditLog` records to long-term storage before pruning.
 
@@ -1312,7 +1344,10 @@ The current state of MegaMTX. Everything documented above is implemented or imme
 - Role-based access control with 6 system roles and 25 permissions
 - Append-only audit logging for every mutation and authentication event
 - Outbound email notifications via Nodemailer/SMTP
-- Opt-in outbound SMS notifications via Twilio
+- Mobile push notifications via Firebase Cloud Messaging (FCM) — iOS, Android, and web
+- Device token registration endpoint (`POST /api/devices`) — live
+- Capacitor 6 native app shell for iOS and Android (web code reuse)
+- PWA manifest and mobile-safe-area viewport for web deployments
 - Location hierarchy (unlimited nesting depth)
 - Asset registry with barcode/QR code fields
 - Electronic signature model (schema and API endpoint)
@@ -1329,7 +1364,6 @@ The next major development phase, prioritized for maximum operational value:
 - **File attachments (UI)**: Frontend for uploading and viewing photos and documents on tickets. Backend endpoint exists; frontend UI is Phase 2.
 - **Electronic signatures (UI)**: Signature capture modal with password confirmation on ticket completion. Full Part 11 signature flow in the UI.
 - **Dashboard KPIs**: Charts showing open ticket count by priority, tickets closed per week, average resolution time, overdue count. Export to CSV and PDF.
-- **Push notifications**: Device token registration, APNs and FCM integration, per-user push preference settings.
 - **In-app notification center**: Notification feed in the web header, unread count badge, mark-read functionality.
 - **SLA overdue detection**: Background job that scans for tickets past `dueDate` and sends escalation emails.
 
@@ -1337,8 +1371,8 @@ The next major development phase, prioritized for maximum operational value:
 
 Longer-horizon features that require Phase 1 and 2 to be fully stable:
 
-- **Native iOS app**: Swift + SwiftUI. Full ticket lifecycle, camera-to-attachment upload, APNs push, QR asset scanning, offline read cache, write queue with sync.
-- **Native Android app**: Kotlin + Jetpack Compose. Same feature set as iOS, adapted for Android UX conventions. FCM push notifications.
+- **Native iOS app (optional upgrade from Capacitor)**: Swift + SwiftUI. Full ticket lifecycle, camera-to-attachment upload, QR asset scanning, offline read cache, write queue with sync. Push notifications already work via Capacitor; a pure native rebuild offers deeper offline/camera integration.
+- **Native Android app (optional upgrade from Capacitor)**: Kotlin + Jetpack Compose. Same scope as iOS native upgrade.
 - **QR code scanning in the field**: Native camera integration for asset identification. Scan → auto-fill ticket form with asset and location.
 - **Barcode scanner for parts**: Scan parts during repair, log materials used on a ticket. Future: link to ERP inventory for stock-level visibility (read-only).
 - **Offline-first mobile with sync queue**: Full offline support — create tickets and comments offline, queue mutations, replay on reconnect with conflict resolution.

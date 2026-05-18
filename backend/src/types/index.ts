@@ -6,7 +6,7 @@ export interface SubscriptionLimits {
   maxLocations: number | null;
   maxAssets: number | null;
   maxActiveTickets: number | null;
-  allowSms: boolean;
+  allowPush: boolean;
   allowSso: boolean;
   allowExports: boolean;
 }
@@ -102,10 +102,3 @@ export interface EmailOptions {
   templateName?: string;
 }
 
-export interface SmsOptions {
-  to: string;
-  body: string;
-  organizationId?: string;
-  userId?: string;
-  ticketId?: string;
-}

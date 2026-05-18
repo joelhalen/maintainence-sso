@@ -10,12 +10,12 @@ interface Role { id: string; name: string; description?: string; }
 
 interface UserRow {
   id: string; name: string; email: string; role: Role;
-  department?: string; phone?: string; active: boolean; lastLoginAt?: string;
+  department?: string; active: boolean; lastLoginAt?: string;
 }
 
 interface UserFormData {
   name: string; email: string; roleId: string; department: string;
-  phone: string; password: string; active: boolean;
+  password: string; active: boolean;
 }
 
 const ACTION_LABELS: Record<RuleAction, string> = {
@@ -274,7 +274,7 @@ function UserRulesPanel({ userId, userName }: { userId: string; userName: string
 function UserModal({ mode, user, onClose, onSuccess }: { mode: 'create' | 'edit'; user?: UserRow; onClose: () => void; onSuccess: () => void }) {
   const [form, setForm] = useState<UserFormData>({
     name: user?.name ?? '', email: user?.email ?? '', roleId: user?.role.id ?? '',
-    department: user?.department ?? '', phone: user?.phone ?? '', password: '', active: user?.active ?? true,
+    department: user?.department ?? '', password: '', active: user?.active ?? true,
   });
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -291,7 +291,7 @@ function UserModal({ mode, user, onClose, onSuccess }: { mode: 'create' | 'edit'
     try {
       const payload: Record<string, unknown> = {
         name: form.name, email: form.email, roleId: form.roleId,
-        department: form.department || undefined, phone: form.phone || undefined, active: form.active,
+        department: form.department || undefined, active: form.active,
       };
       if (form.password) payload.password = form.password;
       if (mode === 'create') { await api.post('/users', payload); }
@@ -327,15 +327,9 @@ function UserModal({ mode, user, onClose, onSuccess }: { mode: 'create' | 'edit'
               {roles?.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
             </select>
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Department</label>
-              <input value={form.department} onChange={(e) => setForm((f) => ({ ...f, department: e.target.value }))} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Phone</label>
-              <input type="tel" placeholder="+15558675310" value={form.phone} onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-            </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1">Department</label>
+            <input value={form.department} onChange={(e) => setForm((f) => ({ ...f, department: e.target.value }))} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-700 mb-1">

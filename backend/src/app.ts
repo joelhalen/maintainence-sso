@@ -19,11 +19,10 @@ import exportRouter from './routes/export';
 import webhooksRouter from './routes/webhooks';
 import organizationsRouter from './routes/organizations';
 import adminEmailRouter from './routes/adminEmail';
-import adminSmsRouter from './routes/adminSms';
+import adminPushRouter from './routes/adminPush';
 import platformRouter from './routes/platform';
 import groupsRouter from './routes/groups';
 import permissionRulesRouter from './routes/permissionRules';
-import phoneRouter from './routes/phone';
 import { errorHandler, notFound } from './middleware/errorHandler';
 import { logger } from './config/logger';
 
@@ -61,11 +60,10 @@ app.use('/api/export', exportRouter);
 app.use('/api/webhooks', webhooksRouter);
 app.use('/api/organizations', organizationsRouter);
 app.use('/api/admin/email', adminEmailRouter);
-app.use('/api/admin/sms', adminSmsRouter);
+app.use('/api/admin/push', adminPushRouter);
 app.use('/api/platform', platformRouter);
 app.use('/api/groups', groupsRouter);
 app.use('/api/permission-rules', permissionRulesRouter);
-app.use('/api/phone', phoneRouter);
 
 app.get('/api/health', (_req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }));
 

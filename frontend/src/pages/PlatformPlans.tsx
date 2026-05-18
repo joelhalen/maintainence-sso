@@ -11,7 +11,7 @@ interface Plan {
   maxLocations?: number | null;
   maxAssets?: number | null;
   maxActiveTickets?: number | null;
-  allowSms: boolean;
+  allowPush: boolean;
   allowSso: boolean;
   allowExports: boolean;
   active: boolean;
@@ -93,8 +93,8 @@ export default function PlatformPlansPage() {
 
             <div className="flex flex-wrap gap-4 text-sm text-gray-600">
               <label className="flex items-center gap-2">
-                <input type="checkbox" checked={plan.allowSms} onChange={(e) => updatePlan(plan.id, { allowSms: e.target.checked })} />
-                SMS
+                <input type="checkbox" checked={plan.allowPush} onChange={(e) => updatePlan(plan.id, { allowPush: e.target.checked })} />
+                Push
               </label>
               <label className="flex items-center gap-2">
                 <input type="checkbox" checked={plan.allowSso} onChange={(e) => updatePlan(plan.id, { allowSso: e.target.checked })} />
