@@ -6,13 +6,17 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "preview": "vite preview",
+    "build:capacitor": "VITE_CAPACITOR_BUILD=true CAPACITOR_BUILD=true tsc && VITE_CAPACITOR_BUILD=true CAPACITOR_BUILD=true vite build",
+    "cap:sync": "npx cap sync android",
+    "cap:open": "npx cap open android",
     "lint": "eslint src --ext ts,tsx"
   },
   "dependencies": {
+    "@capacitor/app": "^6.0.3",
     "@capacitor/core": "^6.0.0",
     "@capacitor/push-notifications": "^6.0.0",
     "@capacitor/status-bar": "^6.0.0",
+    "@hookform/resolvers": "^3.6.0",
     "@tanstack/react-query": "^5.45.0",
     "@tanstack/react-table": "^8.19.2",
     "axios": "^1.7.2",
@@ -24,8 +28,7 @@
     "react-hook-form": "^7.52.1",
     "react-router-dom": "^6.24.0",
     "recharts": "^2.12.7",
-    "zod": "^3.23.8",
-    "@hookform/resolvers": "^3.6.0"
+    "zod": "^3.23.8"
   },
   "devDependencies": {
     "@capacitor/android": "^6.0.0",

@@ -14,6 +14,8 @@ import {
   MapPin,
   Wrench,
   Ticket,
+  Plus,
+  Pencil,
 } from 'lucide-react';
 import api from '../api/client';
 
@@ -40,7 +42,7 @@ interface OrgUser {
   active: boolean;
   isPlatformAdmin: boolean;
   createdAt: string;
-  role: { name: string } | null;
+  role: { id: string; name: string } | null;
 }
 
 interface OrgRole {
@@ -398,6 +400,7 @@ function OverviewTab({ org }: { org: OrgDetail }) {
 
 function UsersTab({ org }: { org: OrgDetail }) {
   const [search, setSearch] = useState('');
+  const addUserPath = `/platform/organizations/${org.id}/users/new`;
 
   const filtered = org.users.filter(
     (u) =>
@@ -416,6 +419,12 @@ function UsersTab({ org }: { org: OrgDetail }) {
           className="flex-1 max-w-sm border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
         <span className="text-sm text-gray-500">{filtered.length} users</span>
+        <Link
+          to={addUserPath}
+          className="ml-auto flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
+        >
+          <Plus size={16} /> Add user
+        </Link>
       </div>
 
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
@@ -425,7 +434,7 @@ function UsersTab({ org }: { org: OrgDetail }) {
           <table className="w-full text-sm">
             <thead className="bg-gray-50 border-b border-gray-100">
               <tr>
-                {['Name / Email', 'Role', 'Status', 'Platform Admin', 'Joined'].map((h) => (
+                {['Name / Email', 'Role', 'Status', 'Platform Admin', 'Joined', ''].map((h) => (
                   <th
                     key={h}
                     className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide"
@@ -456,6 +465,15 @@ function UsersTab({ org }: { org: OrgDetail }) {
                   </td>
                   <td className="px-4 py-3 text-gray-400 text-xs whitespace-nowrap">
                     {new Date(user.createdAt).toLocaleDateString()}
+                  </td>
+                  <td className="px-4 py-3">
+                    <Link
+                      to={`/platform/organizations/${org.id}/users/${user.id}/edit`}
+                      className="text-gray-400 hover:text-blue-600 p-1 inline-flex"
+                      title="Edit user"
+                    >
+                      <Pencil size={14} />
+                    </Link>
                   </td>
                 </tr>
               ))}

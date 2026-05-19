@@ -4,6 +4,8 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import Layout from './components/Layout';
 import AdminLayout from './components/AdminLayout';
 import LoginPage from './pages/Login';
+import RegisterPage from './pages/Register';
+import { OrgUserAccountPage, PlatformUserAccountPage } from './pages/UserAccountPage';
 import LandingPage from './pages/Landing';
 import DashboardPage from './pages/Dashboard';
 import TicketsPage from './pages/Tickets';
@@ -23,7 +25,9 @@ import PlatformRolesPage from './pages/PlatformRoles';
 import PlatformOrgDetailPage from './pages/PlatformOrgDetail';
 import PlatformAuditLogPage from './pages/PlatformAuditLog';
 import PlatformSystemConfigPage from './pages/PlatformSystemConfig';
+import PlatformMobileReleasePage from './pages/PlatformMobileRelease';
 import GroupsPage from './pages/Groups';
+import AppUpdateGate from './components/AppUpdateGate';
 
 class ErrorBoundary extends React.Component<
   { children: React.ReactNode },
@@ -65,6 +69,13 @@ function PrivateRoute({ children }: { children: React.ReactNode }) {
   return token ? <>{children}</> : <Navigate to="/login" replace />;
 }
 
+function PlatformAdminRoute({ children }: { children: React.ReactNode }) {
+  const { token, isPlatformAdmin } = useAuth();
+  if (!token) return <Navigate to="/login" replace />;
+  if (!isPlatformAdmin) return <Navigate to="/" replace />;
+  return <>{children}</>;
+}
+
 /** Renders the analytics dashboard for managers/admins, or the action landing page for everyone else. */
 function HomePage() {
   const { hasPermission, isPlatformAdmin } = useAuth();
@@ -77,6 +88,7 @@ function AppRoutes() {
   return (
     <Routes>
       <Route path="/login" element={token ? <Navigate to="/" replace /> : <LoginPage />} />
+      <Route path="/register" element={token ? <Navigate to="/" replace /> : <RegisterPage />} />
       <Route path="/" element={<PrivateRoute><Layout /></PrivateRoute>}>
         <Route index element={<HomePage />} />
         <Route path="tickets" element={<TicketsPage />} />
@@ -84,6 +96,8 @@ function AppRoutes() {
         <Route path="assets" element={<AssetsPage />} />
         <Route path="locations" element={<LocationsPage />} />
         <Route path="users" element={<UsersPage />} />
+        <Route path="users/new" element={<OrgUserAccountPage />} />
+        <Route path="users/:userId/edit" element={<OrgUserAccountPage />} />
         <Route path="reports" element={<ReportsPage />} />
         <Route path="settings/notifications" element={<NotificationSettingsPage />} />
         <Route path="settings/organization" element={<OrganizationSettingsPage />} />
@@ -91,14 +105,17 @@ function AppRoutes() {
         <Route path="settings/push" element={<PushSettingsPage />} />
         <Route path="groups" element={<GroupsPage />} />
       </Route>
-      <Route path="/platform" element={<PrivateRoute><AdminLayout /></PrivateRoute>}>
+      <Route path="/platform" element={<PlatformAdminRoute><AdminLayout /></PlatformAdminRoute>}>
         <Route index element={<PlatformDashboardPage />} />
         <Route path="organizations" element={<PlatformOrganizationsPage />} />
         <Route path="organizations/:id" element={<PlatformOrgDetailPage />} />
+        <Route path="organizations/:organizationId/users/new" element={<PlatformUserAccountPage />} />
+        <Route path="organizations/:organizationId/users/:userId/edit" element={<PlatformUserAccountPage />} />
         <Route path="organizations/:organizationId/roles" element={<PlatformRolesPage />} />
         <Route path="plans" element={<PlatformPlansPage />} />
         <Route path="audit" element={<PlatformAuditLogPage />} />
         <Route path="system-config" element={<PlatformSystemConfigPage />} />
+        <Route path="mobile-release" element={<PlatformMobileReleasePage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
@@ -109,9 +126,11 @@ export default function App() {
   return (
     <ErrorBoundary>
       <AuthProvider>
-        <BrowserRouter>
-          <AppRoutes />
-        </BrowserRouter>
+        <AppUpdateGate>
+          <BrowserRouter>
+            <AppRoutes />
+          </BrowserRouter>
+        </AppUpdateGate>
       </AuthProvider>
     </ErrorBoundary>
   );

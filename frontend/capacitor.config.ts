@@ -5,7 +5,8 @@ const config: CapacitorConfig = {
   appName: 'MegaMTX',
   webDir: 'dist',
   server: {
-    // Use https scheme on Android for secure cookie/JWT storage
+    // Bundled assets only — API calls use VITE_API_URL (see src/api/client.ts).
+    // Do not set `url` here; that would turn the app into a remote WebView.
     androidScheme: 'https',
   },
   plugins: {

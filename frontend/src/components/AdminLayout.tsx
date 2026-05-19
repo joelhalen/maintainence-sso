@@ -3,7 +3,7 @@ import { Outlet, NavLink, Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import {
   LayoutDashboard, Building2, CreditCard, ScrollText, Settings2,
-  ShieldCheck, ArrowLeft, Menu, X, ChevronRight,
+  ShieldCheck, ArrowLeft, LogOut, Menu, X, ChevronRight, Smartphone,
 } from 'lucide-react';
 import clsx from 'clsx';
 
@@ -20,6 +20,7 @@ const NAV_ITEMS: NavItem[] = [
   { to: '/platform/plans',       label: 'Subscription Plans', icon: CreditCard },
   { to: '/platform/audit',       label: 'Audit Log',          icon: ScrollText },
   { to: '/platform/system-config', label: 'System Config',   icon: Settings2 },
+  { to: '/platform/mobile-release', label: 'Mobile App',      icon: Smartphone },
 ];
 
 const BREADCRUMB_MAP: Record<string, string> = {
@@ -28,6 +29,7 @@ const BREADCRUMB_MAP: Record<string, string> = {
   '/platform/plans':                    'Subscription Plans',
   '/platform/audit':                    'Audit Log',
   '/platform/system-config':            'System Config',
+  '/platform/mobile-release':           'Mobile App Release',
 };
 
 function getPageLabel(pathname: string): string {
@@ -44,7 +46,7 @@ function getPageLabel(pathname: string): string {
 }
 
 export default function AdminLayout() {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const location = useLocation();
 
@@ -116,11 +118,18 @@ export default function AdminLayout() {
           {/* Return to App */}
           <Link
             to="/"
-            className="flex items-center gap-2 text-slate-400 hover:text-white text-sm transition-colors"
+            className="flex items-center gap-2 text-slate-400 hover:text-white text-sm transition-colors mb-2"
           >
             <ArrowLeft size={16} />
             Return to App
           </Link>
+          <button
+            onClick={logout}
+            className="flex items-center gap-2 w-full px-3 py-2 text-sm text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"
+          >
+            <LogOut size={16} />
+            Sign out
+          </button>
         </div>
       </aside>
 
@@ -155,6 +164,13 @@ export default function AdminLayout() {
             </div>
             {/* User name */}
             <span className="text-slate-300 text-sm hidden sm:block">{user?.name}</span>
+            <button
+              onClick={logout}
+              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-slate-300 hover:text-white border border-slate-700 rounded-lg hover:bg-slate-800 transition-colors"
+            >
+              <LogOut size={14} />
+              <span className="hidden sm:inline">Sign out</span>
+            </button>
           </div>
         </header>
 

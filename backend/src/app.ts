@@ -23,8 +23,12 @@ import adminPushRouter from './routes/adminPush';
 import platformRouter from './routes/platform';
 import groupsRouter from './routes/groups';
 import permissionRulesRouter from './routes/permissionRules';
+import appVersionRouter from './routes/appVersion';
+import publicRouter from './routes/public';
+import platformMobileReleaseRouter from './routes/platformMobileRelease';
 import { errorHandler, notFound } from './middleware/errorHandler';
 import { logger } from './config/logger';
+import { getCorsOrigin } from './config/cors';
 
 const app = express();
 
@@ -32,7 +36,7 @@ app.set('trust proxy', 1);
 
 app.use(helmet());
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+  origin: getCorsOrigin(),
   credentials: true,
 }));
 app.use(compression());
@@ -62,10 +66,13 @@ app.use('/api/organizations', organizationsRouter);
 app.use('/api/admin/email', adminEmailRouter);
 app.use('/api/admin/push', adminPushRouter);
 app.use('/api/platform', platformRouter);
+app.use('/api/platform/mobile-release', platformMobileReleaseRouter);
 app.use('/api/groups', groupsRouter);
 app.use('/api/permission-rules', permissionRulesRouter);
 
 app.get('/api/health', (_req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }));
+app.use('/api/public', publicRouter);
+app.use('/api/app', appVersionRouter);
 
 // In production the compiled backend serves the built React frontend.
 // Static assets are served first; any non-API GET falls back to index.html

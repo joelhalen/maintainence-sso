@@ -7,16 +7,6 @@
  * set up separately).
  */
 
-import { Capacitor } from '@capacitor/core';
-
-// Lazily import the native plugin so the web bundle never hard-errors if the
-// Capacitor plugin isn't installed (it won't be present on plain web builds).
-async function getNativePlugin() {
-  if (!Capacitor.isNativePlatform()) return null;
-  const { PushNotifications } = await import('@capacitor/push-notifications');
-  return PushNotifications;
-}
-
 export type PushPlatform = 'IOS' | 'ANDROID' | 'WEB';
 
 export interface DeviceRegistration {
@@ -24,41 +14,58 @@ export interface DeviceRegistration {
   platform: PushPlatform;
 }
 
+// Lazily import Capacitor so the web bundle never hard-errors if native deps are missing.
+async function getCapacitor() {
+  try {
+    const { Capacitor } = await import('@capacitor/core');
+    return Capacitor;
+  } catch {
+    return null;
+  }
+}
+
+async function getNativePlugin() {
+  const Capacitor = await getCapacitor();
+  if (!Capacitor?.isNativePlatform()) return null;
+  try {
+    const { PushNotifications } = await import('@capacitor/push-notifications');
+    return { Capacitor, PushNotifications };
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Request push notification permission and return the device token.
  * Returns null if the user denies permission or the platform is unsupported.
  */
 export async function requestPushPermission(): Promise<DeviceRegistration | null> {
-  const plugin = await getNativePlugin();
-
-  if (plugin) {
-    const permission = await plugin.requestPermissions();
-    if (permission.receive !== 'granted') return null;
-
-    return new Promise((resolve) => {
-      plugin.addListener('registration', (event) => {
-        resolve({
-          token: event.value,
-          platform: Capacitor.getPlatform().toUpperCase() as PushPlatform,
-        });
-      });
-
-      plugin.addListener('registrationError', () => resolve(null));
-
-      plugin.register();
-    });
-  }
-
-  // Web fallback: browser Notification API
-  if ('Notification' in window) {
-    const result = await Notification.requestPermission();
-    if (result !== 'granted') return null;
-    // Full web push requires a service worker + VAPID subscription — signal that
-    // browser push is available but the token will be obtained via SW registration.
+  const native = await getNativePlugin();
+  if (!native) {
+    // Web fallback: browser Notification API
+    if ('Notification' in window) {
+      const result = await Notification.requestPermission();
+      if (result !== 'granted') return null;
+    }
     return null;
   }
 
-  return null;
+  const { Capacitor, PushNotifications } = native;
+  const permission = await PushNotifications.requestPermissions();
+  if (permission.receive !== 'granted') return null;
+
+  return new Promise((resolve) => {
+    PushNotifications.addListener('registration', (event: { value: string }) => {
+      resolve({
+        token: event.value,
+        platform: Capacitor.getPlatform().toUpperCase() as PushPlatform,
+      });
+    });
+
+    PushNotifications.addListener('registrationError', () => resolve(null));
+
+    PushNotifications.register();
+  });
 }
 
 /**
@@ -84,6 +91,7 @@ export async function registerDeviceWithBackend(
 /**
  * Returns true when the current runtime is a Capacitor-wrapped native app.
  */
-export function isNativeApp(): boolean {
-  return Capacitor.isNativePlatform();
+export async function isNativeApp(): Promise<boolean> {
+  const Capacitor = await getCapacitor();
+  return Capacitor?.isNativePlatform() ?? false;
 }

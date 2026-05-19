@@ -18,9 +18,10 @@ const LABELS: Record<UsageKey, string> = {
 };
 
 export function PlanBadge({ organization }: { organization: OrganizationContext }) {
+  const planName = organization.subscription?.plan?.name ?? 'No plan';
   return (
     <span className="inline-flex items-center rounded-full bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-700">
-      {organization.subscription.plan.name} plan
+      {planName} plan
     </span>
   );
 }
@@ -34,7 +35,7 @@ export function UsageMeter({
   usage: UsageSummary;
   usageKey: UsageKey;
 }) {
-  const limit = organization.subscription.plan.limits[USAGE_LIMITS[usageKey]];
+  const limit = organization.subscription?.plan?.limits?.[USAGE_LIMITS[usageKey]];
   const current = usage[usageKey];
   const percent = limit ? Math.min(100, Math.round((current / limit) * 100)) : 0;
 
@@ -57,13 +58,13 @@ export function isLimitReached(
   usageKey: UsageKey
 ) {
   if (!organization || !usage) return false;
-  const limit = organization.subscription.plan.limits[USAGE_LIMITS[usageKey]];
+  const limit = organization.subscription?.plan?.limits?.[USAGE_LIMITS[usageKey]];
   return limit !== null && usage[usageKey] >= limit;
 }
 
 export function limitMessage(organization: OrganizationContext, usageKey: UsageKey) {
-  const limit = organization.subscription.plan.limits[USAGE_LIMITS[usageKey]];
+  const limit = organization.subscription?.plan?.limits?.[USAGE_LIMITS[usageKey]];
   return limit === null
     ? ''
-    : `${LABELS[usageKey]} limit reached for the ${organization.subscription.plan.name} plan.`;
+    : `${LABELS[usageKey]} limit reached for the ${organization.subscription?.plan?.name ?? 'current'} plan.`;
 }

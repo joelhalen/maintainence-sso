@@ -159,15 +159,24 @@ export default function Layout() {
             <ChevronRight size={14} />
             <span className="text-gray-900 font-medium">Maintenance</span>
           </div>
-          {isPlatformAdmin && (
-            <Link
-              to="/platform"
-              className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-600 hover:bg-violet-700 text-white text-xs font-semibold transition-colors"
+          <div className="ml-auto flex items-center gap-2">
+            {isPlatformAdmin && (
+              <Link
+                to="/platform"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-600 hover:bg-violet-700 text-white text-xs font-semibold transition-colors"
+              >
+                <ShieldCheck size={14} />
+                Admin Portal
+              </Link>
+            )}
+            <button
+              onClick={logout}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-200 text-gray-600 hover:text-gray-900 hover:bg-gray-50 text-xs font-medium transition-colors"
             >
-              <ShieldCheck size={14} />
-              Admin Portal
-            </Link>
-          )}
+              <LogOut size={14} />
+              Sign out
+            </button>
+          </div>
         </header>
         <main className="flex-1 overflow-y-auto p-6">
           <Outlet />

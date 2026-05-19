@@ -106,7 +106,7 @@ export default function TicketsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {data?.data.map((ticket) => (
+                  {(data?.data ?? []).map((ticket) => (
                     <tr key={ticket.id} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
                       <td className="px-4 py-3">
                         <Link to={`/tickets/${ticket.id}`} className="hover:text-blue-600">

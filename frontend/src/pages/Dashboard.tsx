@@ -15,14 +15,17 @@ const PRIORITY_COLORS: Record<string, string> = {
 };
 
 export default function DashboardPage() {
-  const { data, isLoading } = useQuery<SummaryData>({
+  const { data, isLoading, isError } = useQuery<SummaryData>({
     queryKey: ['reports/summary'],
     queryFn: () => api.get('/reports/summary').then((r) => r.data),
   });
 
-  const openCount = data?.statusCounts.find((s) => s.status === 'OPEN')?._count ?? 0;
-  const inProgressCount = data?.statusCounts.find((s) => s.status === 'IN_PROGRESS')?._count ?? 0;
-  const completedCount = data?.statusCounts.find((s) => s.status === 'COMPLETED')?._count ?? 0;
+  const statusCounts = data?.statusCounts ?? [];
+  const priorityCounts = data?.priorityCounts ?? [];
+
+  const openCount = statusCounts.find((s) => s.status === 'OPEN')?._count ?? 0;
+  const inProgressCount = statusCounts.find((s) => s.status === 'IN_PROGRESS')?._count ?? 0;
+  const completedCount = statusCounts.find((s) => s.status === 'COMPLETED')?._count ?? 0;
   const overdueCount = data?.overdueCount ?? 0;
 
   const stats = [
@@ -33,6 +36,26 @@ export default function DashboardPage() {
   ];
 
   if (isLoading) return <div className="flex items-center justify-center h-64 text-gray-400">Loading...</div>;
+
+  if (isError) {
+    return (
+      <div className="space-y-4">
+        <h1 className="text-xl font-semibold text-gray-900">Dashboard</h1>
+        <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-xl px-4 py-3">
+          Unable to load dashboard data. You may not have permission, or the server is unavailable.
+        </div>
+      </div>
+    );
+  }
+
+  const statusChartData = statusCounts.map((s) => ({
+    name: s.status.replace(/_/g, ' '),
+    count: s._count,
+  }));
+  const priorityChartData = priorityCounts.map((p) => ({
+    name: p.priority,
+    value: p._count,
+  }));
 
   return (
     <div className="space-y-6">
@@ -58,7 +81,7 @@ export default function DashboardPage() {
         <div className="bg-white rounded-xl border border-gray-200 p-6">
           <h2 className="text-sm font-semibold text-gray-700 mb-4">Tickets by Status</h2>
           <ResponsiveContainer width="100%" height={220}>
-            <BarChart data={data?.statusCounts.map((s) => ({ name: s.status.replace(/_/g, ' '), count: s._count }))}>
+            <BarChart data={statusChartData}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
               <XAxis dataKey="name" tick={{ fontSize: 11 }} />
               <YAxis tick={{ fontSize: 11 }} />
@@ -73,14 +96,14 @@ export default function DashboardPage() {
           <ResponsiveContainer width="100%" height={220}>
             <PieChart>
               <Pie
-                data={data?.priorityCounts.map((p) => ({ name: p.priority, value: p._count }))}
+                data={priorityChartData}
                 cx="50%" cy="50%"
                 outerRadius={80}
                 dataKey="value"
                 label={({ name, value }) => `${name}: ${value}`}
                 labelLine={false}
               >
-                {data?.priorityCounts.map((p) => (
+                {priorityCounts.map((p) => (
                   <Cell key={p.priority} fill={PRIORITY_COLORS[p.priority] || '#6b7280'} />
                 ))}
               </Pie>

@@ -104,26 +104,68 @@ pm2 startup   # enable auto-start on reboot
 
 ## Mobile (iOS / Android)
 
-MegaMTX ships a **Capacitor 6** wrapper that packages the React web app into native iOS and Android apps, enabling native push notifications.
+MegaMTX uses **Capacitor 6** with a **bundled** web build (not a remote WebView). The APK talks to your server via `VITE_API_URL` (default `https://megamtx.joelhalen.net/api`).
+
+### One-time: Android SDK on the build server
+
+```bash
+sudo ./scripts/install-android-sdk.sh
+source /etc/profile.d/android-sdk.sh
+```
+
+### Build APK and publish for download
+
+```bash
+./scripts/build-android-apk.sh
+# → releases/megamtx-latest.apk
+# → https://megamtx.joelhalen.net/download_apk  (after nginx config)
+```
+
+Override API URL for staging:
+
+```bash
+VITE_API_URL=https://staging.example.com/api ./scripts/build-android-apk.sh
+```
+
+### Local development with Android Studio
 
 ```bash
 cd frontend
-
-# Initial native project setup (one-time)
 npm install
-npx cap add ios
-npx cap add android
-
-# After any frontend code change
-npm run build
-npx cap sync
-
-# Open in Xcode / Android Studio
-npx cap open ios
+npm run build:capacitor
+npx cap sync android
 npx cap open android
 ```
 
-**Push notifications** are delivered via Firebase Cloud Messaging. Configure `FIREBASE_*` env vars on the backend and add `google-services.json` (Android) / `GoogleService-Info.plist` (iOS) to their respective native project directories.
+**Push notifications** need Firebase: set `FIREBASE_*` on the backend and add `google-services.json` under `frontend/android/app/`.
+
+See `frontend/.env.capacitor.example` and `deploy/nginx-megamtx.conf`.
+
+### In-app updates (Android sideload)
+
+On launch, the native app checks `GET /api/app/version` against the installed `versionCode`. When a newer APK is published, users see an update screen that **downloads and opens the installer automatically** (one confirmation tap in Android).
+
+```bash
+./scripts/build-android-apk.sh   # bumps versionCode, updates releases/build-info.json
+```
+
+Force older clients to update before use:
+
+```bash
+APP_MIN_VERSION_CODE=3 ./scripts/build-android-apk.sh
+```
+
+Store URLs (`APP_PLAY_STORE_URL`, `APP_APP_STORE_URL`) are reserved for a future Play/App Store flow.
+
+### Platform admin: mobile release dashboard
+
+Platform admins can manage versions and trigger APK builds at **Platform → Mobile App** (`/platform/mobile-release`):
+
+- Edit **version name**, **current version code**, and **minimum version code** (live immediately for all installed apps)
+- Set APK / store URLs without redeploying code
+- **Build & publish APK** runs `scripts/build-android-apk.sh` on the server (requires Android SDK)
+
+Settings are stored in `backend/data/mobile-release-config.json`.
 
 ---
 

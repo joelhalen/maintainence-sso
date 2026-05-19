@@ -1,7 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { body, validationResult } from 'express-validator';
+import { body, param, validationResult } from 'express-validator';
 import prisma from '../config/database';
 import { AppError } from '../middleware/errorHandler';
 import { writeAudit } from '../services/auditService';
@@ -9,6 +9,11 @@ import { AuditAction } from '@prisma/client';
 import { authenticate } from '../middleware/auth';
 import { AuthRequest } from '../types';
 import { toOrganizationContext } from '../services/entitlementService';
+import {
+  createOrganizationUser,
+  isPublicRegistrationEnabled,
+  resolveRegistrationRoleId,
+} from '../services/userService';
 
 const router = Router();
 
@@ -74,7 +79,6 @@ router.post(
         email: user.email,
         name: user.name,
         department: user.department,
-        phone: user.phone,
         active: user.active,
         isPlatformAdmin: user.isPlatformAdmin,
         organizationId: user.organizationId,
@@ -86,6 +90,88 @@ router.post(
         },
       },
     });
+  }
+);
+
+router.get(
+  '/register/orgs/:slug',
+  [param('slug').trim().notEmpty()],
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    if (!isPublicRegistrationEnabled()) {
+      next(new AppError(403, 'Public registration is disabled'));
+      return;
+    }
+    try {
+      const org = await prisma.organization.findFirst({
+        where: { slug: req.params.slug, active: true },
+        select: { id: true, name: true, slug: true },
+      });
+      if (!org) {
+        next(new AppError(404, 'Organization not found'));
+        return;
+      }
+      res.json(org);
+    } catch (e) {
+      next(e);
+    }
+  }
+);
+
+router.post(
+  '/register',
+  [
+    body('orgSlug').trim().notEmpty(),
+    body('email').isEmail().normalizeEmail(),
+    body('name').trim().notEmpty(),
+    body('password').isLength({ min: 8 }),
+    body('department').optional().trim(),
+  ],
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    if (!isPublicRegistrationEnabled()) {
+      next(new AppError(403, 'Public registration is disabled'));
+      return;
+    }
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      next(new AppError(400, errors.array()[0].msg as string));
+      return;
+    }
+
+    const meta = getClientMeta(req);
+    try {
+      const org = await prisma.organization.findFirst({
+        where: { slug: req.body.orgSlug, active: true },
+      });
+      if (!org) {
+        next(new AppError(404, 'Organization not found'));
+        return;
+      }
+
+      const roleId = await resolveRegistrationRoleId(org.id);
+      const user = await createOrganizationUser({
+        organizationId: org.id,
+        email: req.body.email,
+        name: req.body.name,
+        roleId,
+        password: req.body.password,
+        department: req.body.department,
+        forbidPrivilegedRoles: true,
+      });
+
+      await writeAudit({
+        organizationId: org.id,
+        userId: user.id,
+        action: AuditAction.CREATE,
+        resource: 'auth_register',
+        resourceId: user.id,
+        notes: 'Self-registration',
+        ...meta,
+      });
+
+      res.status(201).json({ message: 'Account created successfully', userId: user.id });
+    } catch (e) {
+      next(e);
+    }
   }
 );
 

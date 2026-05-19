@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Pencil, Shield, Trash2, ChevronRight, ShieldPlus } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
@@ -13,11 +14,6 @@ interface UserRow {
   department?: string; active: boolean; lastLoginAt?: string;
 }
 
-interface UserFormData {
-  name: string; email: string; roleId: string; department: string;
-  password: string; active: boolean;
-}
-
 const ACTION_LABELS: Record<RuleAction, string> = {
   VIEW: 'View tickets', COMMENT: 'Leave comments', UPDATE_STATUS: 'Update status',
   CLOSE: 'Close / complete', ASSIGN: 'Assign tickets', CREATE: 'Create tickets', EXPORT: 'Export tickets',
@@ -27,8 +23,6 @@ const TICKET_TYPES: TicketTypeValue[] = ['CORRECTIVE', 'PREVENTIVE', 'INSPECTION
 
 export default function UsersPage() {
   const { hasPermission } = useAuth();
-  const qc = useQueryClient();
-  const [modal, setModal] = useState<null | { mode: 'create' | 'edit'; user?: UserRow }>(null);
   const [expandedUser, setExpandedUser] = useState<string | null>(null);
 
   const { data: users, isLoading } = useQuery<UserRow[]>({
@@ -53,14 +47,22 @@ export default function UsersPage() {
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold text-gray-900">Users</h1>
         {hasPermission('USER_CREATE') && (
-          <button
-            onClick={() => setModal({ mode: 'create' })}
-            disabled={userLimitReached}
-            title={userLimitReached && subscription ? limitMessage(subscription.organization, 'activeUsers') : undefined}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <Plus size={16} /> Add User
-          </button>
+          userLimitReached ? (
+            <button
+              disabled
+              title={subscription ? limitMessage(subscription.organization, 'activeUsers') : undefined}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium opacity-50 cursor-not-allowed"
+            >
+              <Plus size={16} /> Add User
+            </button>
+          ) : (
+            <Link
+              to="/users/new"
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
+            >
+              <Plus size={16} /> Add User
+            </Link>
+          )
         )}
       </div>
       {userLimitReached && subscription && (
@@ -83,8 +85,8 @@ export default function UsersPage() {
             </thead>
             <tbody>
               {users?.map((u) => (
-                <>
-                  <tr key={u.id} className="border-b border-gray-50 hover:bg-gray-50">
+                <React.Fragment key={u.id}>
+                  <tr className="border-b border-gray-50 hover:bg-gray-50">
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
                         <div className="w-7 h-7 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-xs font-semibold flex-shrink-0">
@@ -118,9 +120,9 @@ export default function UsersPage() {
                           </button>
                         )}
                         {hasPermission('USER_UPDATE') && (
-                          <button onClick={() => setModal({ mode: 'edit', user: u })} className="text-gray-400 hover:text-blue-600 p-1">
+                          <Link to={`/users/${u.id}/edit`} className="text-gray-400 hover:text-blue-600 p-1">
                             <Pencil size={14} />
-                          </button>
+                          </Link>
                         )}
                         <ChevronRight size={14} className={`text-gray-300 transition-transform ${expandedUser === u.id ? 'rotate-90' : ''}`} />
                       </div>
@@ -133,25 +135,13 @@ export default function UsersPage() {
                       </td>
                     </tr>
                   )}
-                </>
+                </React.Fragment>
               ))}
             </tbody>
           </table>
         )}
       </div>
 
-      {modal && (
-        <UserModal
-          mode={modal.mode}
-          user={modal.user}
-          onClose={() => setModal(null)}
-          onSuccess={() => {
-            setModal(null);
-            qc.invalidateQueries({ queryKey: ['users'] });
-            qc.invalidateQueries({ queryKey: ['organization-me'] });
-          }}
-        />
-      )}
     </div>
   );
 }
@@ -267,95 +257,6 @@ function UserRulesPanel({ userId, userName }: { userId: string; userName: string
           ))}
         </div>
       )}
-    </div>
-  );
-}
-
-function UserModal({ mode, user, onClose, onSuccess }: { mode: 'create' | 'edit'; user?: UserRow; onClose: () => void; onSuccess: () => void }) {
-  const [form, setForm] = useState<UserFormData>({
-    name: user?.name ?? '', email: user?.email ?? '', roleId: user?.role.id ?? '',
-    department: user?.department ?? '', password: '', active: user?.active ?? true,
-  });
-  const [error, setError] = useState('');
-  const [submitting, setSubmitting] = useState(false);
-
-  const { data: roles } = useQuery<Role[]>({
-    queryKey: ['roles'],
-    queryFn: () => api.get('/users/roles').then((r) => r.data),
-  });
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-    setSubmitting(true);
-    try {
-      const payload: Record<string, unknown> = {
-        name: form.name, email: form.email, roleId: form.roleId,
-        department: form.department || undefined, active: form.active,
-      };
-      if (form.password) payload.password = form.password;
-      if (mode === 'create') { await api.post('/users', payload); }
-      else { await api.patch(`/users/${user!.id}`, payload); }
-      onSuccess();
-    } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error;
-      setError(msg || 'Failed to save user');
-    } finally { setSubmitting(false); }
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between p-5 border-b border-gray-100">
-          <h2 className="text-base font-semibold">{mode === 'create' ? 'Add User' : 'Edit User'}</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">✕</button>
-        </div>
-        <form onSubmit={handleSubmit} className="p-5 space-y-4">
-          {error && <div className="bg-red-50 text-red-700 text-sm px-3 py-2 rounded-lg">{error}</div>}
-          <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">Full Name *</label>
-            <input required value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">Email *</label>
-            <input type="email" required value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">Role *</label>
-            <select required value={form.roleId} onChange={(e) => setForm((f) => ({ ...f, roleId: e.target.value }))} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
-              <option value="">Select role</option>
-              {roles?.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">Department</label>
-            <input value={form.department} onChange={(e) => setForm((f) => ({ ...f, department: e.target.value }))} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">
-              {mode === 'create' ? 'Password *' : 'New Password (leave blank to keep current)'}
-            </label>
-            <input
-              type="password" required={mode === 'create'} minLength={8}
-              value={form.password} onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
-              placeholder={mode === 'edit' ? '••••••••' : ''}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-          {mode === 'edit' && (
-            <div className="flex items-center gap-2">
-              <input type="checkbox" id="active" checked={form.active} onChange={(e) => setForm((f) => ({ ...f, active: e.target.checked }))} className="rounded" />
-              <label htmlFor="active" className="text-sm text-gray-700">Account active</label>
-            </div>
-          )}
-          <div className="flex gap-3 pt-2">
-            <button type="button" onClick={onClose} className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm">Cancel</button>
-            <button type="submit" disabled={submitting} className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium disabled:opacity-60">
-              {submitting ? 'Saving...' : mode === 'create' ? 'Add User' : 'Save Changes'}
-            </button>
-          </div>
-        </form>
-      </div>
     </div>
   );
 }

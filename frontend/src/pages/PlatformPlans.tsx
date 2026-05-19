@@ -298,7 +298,7 @@ function LoadingSkeleton() {
 
 export default function PlatformPlansPage() {
   const qc = useQueryClient();
-  const { data: plans, isLoading } = useQuery<Plan[]>({
+  const { data: plans, isLoading, isError, error, refetch } = useQuery<Plan[]>({
     queryKey: ['platform-plans'],
     queryFn: () => api.get('/platform/plans').then((r) => r.data),
   });
@@ -323,25 +323,46 @@ export default function PlatformPlansPage() {
 
       {isLoading ? (
         <LoadingSkeleton />
+      ) : isError ? (
+        <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-4 space-y-3">
+          <p className="flex items-center gap-2 text-sm text-red-700">
+            <AlertCircle size={16} />
+            Failed to load subscription plans. The API may be unavailable or your session may have expired.
+          </p>
+          <p className="text-xs text-red-600">
+            {(error as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'Request failed'}
+          </p>
+          <button
+            type="button"
+            onClick={() => refetch()}
+            className="text-sm font-medium text-red-700 underline underline-offset-2 hover:text-red-800"
+          >
+            Try again
+          </button>
+        </div>
+      ) : !plans?.length ? (
+        <p className="bg-white border border-gray-200 rounded-xl px-4 py-10 text-center text-sm text-gray-500">
+          No subscription plans found. Run the database seed to create default tiers.
+        </p>
       ) : (
         <>
-          {/* Plan summary pills */}
-          <div className="flex flex-wrap gap-2">
-            {plans?.map((p) => (
+          <ul className="flex flex-wrap gap-2 list-none m-0 p-0">
+            {plans.map((p) => (
+              <li key={p.id}>
               <span
-                key={p.id}
                 className="text-xs px-2.5 py-1 rounded-full bg-white border border-gray-200 text-gray-600"
               >
                 {p.name} — {formatPrice(p.monthlyPriceCents)}
               </span>
+              </li>
             ))}
-          </div>
+          </ul>
 
-          <div className="grid gap-4 lg:grid-cols-2">
-            {plans?.map((plan) => (
+          <section className="grid gap-4 lg:grid-cols-2">
+            {plans.map((plan) => (
               <PlanCard key={plan.id} serverPlan={plan} onSave={savePlan} />
             ))}
-          </div>
+          </section>
         </>
       )}
     </div>

@@ -7,6 +7,7 @@ import { requirePlatformAdmin } from '../middleware/rbac';
 import { AppError } from '../middleware/errorHandler';
 import prisma from '../config/database';
 import { writeAudit } from '../services/auditService';
+import { createOrganizationUser, updateOrganizationUser } from '../services/userService';
 import fs from 'fs/promises';
 import path from 'path';
 
@@ -115,7 +116,7 @@ router.get(
               active: true,
               isPlatformAdmin: true,
               createdAt: true,
-              role: { select: { name: true } },
+              role: { select: { id: true, name: true } },
             },
           },
           roles: {
@@ -500,6 +501,97 @@ router.patch(
         ...req.auditMeta,
       });
       res.json(updated);
+    } catch (e) {
+      next(e);
+    }
+  }
+);
+
+router.get(
+  '/organizations/:organizationId/users/:userId',
+  async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const user = await prisma.user.findFirst({
+        where: { id: req.params.userId, organizationId: req.params.organizationId },
+        include: { role: { select: { id: true, name: true, description: true } } },
+      });
+      if (!user) { next(new AppError(404, 'User not found')); return; }
+      const { passwordHash, ...safeUser } = user;
+      res.json(safeUser);
+    } catch (e) {
+      next(e);
+    }
+  }
+);
+
+router.post(
+  '/organizations/:organizationId/users',
+  [
+    param('organizationId').notEmpty(),
+    body('email').isEmail().normalizeEmail(),
+    body('name').trim().notEmpty(),
+    body('roleId').notEmpty(),
+    body('password').isLength({ min: 8 }),
+    body('department').optional().trim(),
+    body('active').optional().isBoolean(),
+    body('isPlatformAdmin').optional().isBoolean(),
+  ],
+  async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) { next(new AppError(400, errors.array()[0].msg as string)); return; }
+
+    try {
+      const user = await createOrganizationUser({
+        organizationId: req.params.organizationId,
+        email: req.body.email,
+        name: req.body.name,
+        roleId: req.body.roleId,
+        password: req.body.password,
+        department: req.body.department,
+        active: req.body.active,
+        isPlatformAdmin: req.body.isPlatformAdmin === true,
+        auditUserId: req.user!.id,
+        auditMeta: req.auditMeta,
+      });
+      res.status(201).json(user);
+    } catch (e) {
+      next(e);
+    }
+  }
+);
+
+router.patch(
+  '/organizations/:organizationId/users/:userId',
+  [
+    param('organizationId').notEmpty(),
+    param('userId').notEmpty(),
+    body('email').optional().isEmail().normalizeEmail(),
+    body('name').optional().trim().notEmpty(),
+    body('roleId').optional().notEmpty(),
+    body('password').optional().isLength({ min: 8 }),
+    body('department').optional().trim(),
+    body('active').optional().isBoolean(),
+    body('isPlatformAdmin').optional().isBoolean(),
+  ],
+  async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) { next(new AppError(400, errors.array()[0].msg as string)); return; }
+
+    try {
+      const user = await updateOrganizationUser({
+        organizationId: req.params.organizationId,
+        userId: req.params.userId,
+        name: req.body.name,
+        email: req.body.email,
+        roleId: req.body.roleId,
+        department: req.body.department,
+        active: req.body.active,
+        password: req.body.password,
+        isPlatformAdmin: req.body.isPlatformAdmin,
+        auditUserId: req.user!.id,
+        auditMeta: req.auditMeta,
+      });
+      res.json(user);
     } catch (e) {
       next(e);
     }

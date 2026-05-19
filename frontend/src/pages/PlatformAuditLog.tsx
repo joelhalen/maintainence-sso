@@ -348,7 +348,7 @@ export default function PlatformAuditLogPage() {
           <tbody className="divide-y divide-gray-50">
             {isLoading
               ? Array.from({ length: 10 }).map((_, i) => <SkeletonRow key={i} />)
-              : data?.logs.map((log: AuditLog) => (
+              : (data?.logs ?? []).map((log: AuditLog) => (
                   <AuditLogRow
                     key={log.id}
                     log={log}

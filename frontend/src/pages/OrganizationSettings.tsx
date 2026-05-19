@@ -54,11 +54,11 @@ export default function OrganizationSettingsPage() {
         <div className="grid gap-3 text-sm md:grid-cols-2">
           <div>
             <div className="text-xs text-gray-400 uppercase font-semibold">Provider</div>
-            <div className="text-gray-900">{billing?.provider ?? organization.subscription.provider}</div>
+            <div className="text-gray-900">{billing?.provider ?? organization.subscription?.provider ?? '—'}</div>
           </div>
           <div>
             <div className="text-xs text-gray-400 uppercase font-semibold">Status</div>
-            <div className="text-gray-900">{organization.subscription.status}</div>
+            <div className="text-gray-900">{organization.subscription?.status ?? '—'}</div>
           </div>
           <div>
             <div className="text-xs text-gray-400 uppercase font-semibold">PayPal Subscription</div>
