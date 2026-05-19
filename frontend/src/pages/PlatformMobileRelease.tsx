@@ -99,19 +99,24 @@ export default function PlatformMobileReleasePage() {
     }
   };
 
+  if (isError) {
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center gap-2 text-sm text-red-600 bg-red-50 border border-red-200 rounded-xl px-4 py-3">
+          <AlertCircle size={14} /> Failed to load mobile release settings.
+        </div>
+        <button type="button" onClick={() => refetch()} className="text-sm text-blue-600 hover:text-blue-700 font-medium">
+          Try again
+        </button>
+      </div>
+    );
+  }
+
   if (isLoading || !form) {
     return (
       <div className="space-y-4 animate-pulse">
         <div className="h-6 bg-gray-200 rounded w-1/3" />
         <div className="h-48 bg-white rounded-xl border border-gray-200" />
-      </div>
-    );
-  }
-
-  if (isError) {
-    return (
-      <div className="flex items-center gap-2 text-sm text-red-600 bg-red-50 border border-red-200 rounded-xl px-4 py-3">
-        <AlertCircle size={14} /> Failed to load mobile release settings.
       </div>
     );
   }

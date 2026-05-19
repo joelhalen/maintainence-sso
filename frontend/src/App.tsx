@@ -1,12 +1,11 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
-import Layout from './components/Layout';
-import AdminLayout from './components/AdminLayout';
+import AppShell from './components/marketing/AppShell';
 import LoginPage from './pages/Login';
 import RegisterPage from './pages/Register';
 import { OrgUserAccountPage, PlatformUserAccountPage } from './pages/UserAccountPage';
-import LandingPage from './pages/Landing';
+import ActionLandingPage from './pages/Landing';
 import DashboardPage from './pages/Dashboard';
 import TicketsPage from './pages/Tickets';
 import TicketDetailPage from './pages/TicketDetail';
@@ -28,6 +27,12 @@ import PlatformSystemConfigPage from './pages/PlatformSystemConfig';
 import PlatformMobileReleasePage from './pages/PlatformMobileRelease';
 import GroupsPage from './pages/Groups';
 import AppUpdateGate from './components/AppUpdateGate';
+import AdminLayout from './components/AdminLayout';
+import MarketingHome from './pages/marketing/MarketingHome';
+import FeaturesPage from './pages/marketing/FeaturesPage';
+import PricingPage from './pages/marketing/PricingPage';
+import PrivacyPage from './pages/marketing/PrivacyPage';
+import TermsPage from './pages/marketing/TermsPage';
 
 class ErrorBoundary extends React.Component<
   { children: React.ReactNode },
@@ -54,7 +59,7 @@ class ErrorBoundary extends React.Component<
               onClick={() => { this.setState({ hasError: false, message: '' }); window.location.href = '/'; }}
               className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700"
             >
-              Return to dashboard
+              Return home
             </button>
           </div>
         </div>
@@ -64,11 +69,6 @@ class ErrorBoundary extends React.Component<
   }
 }
 
-function PrivateRoute({ children }: { children: React.ReactNode }) {
-  const { token } = useAuth();
-  return token ? <>{children}</> : <Navigate to="/login" replace />;
-}
-
 function PlatformAdminRoute({ children }: { children: React.ReactNode }) {
   const { token, isPlatformAdmin } = useAuth();
   if (!token) return <Navigate to="/login" replace />;
@@ -76,11 +76,17 @@ function PlatformAdminRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-/** Renders the analytics dashboard for managers/admins, or the action landing page for everyone else. */
-function HomePage() {
+/** Authenticated home: analytics dashboard for managers, action landing for technicians. */
+function AuthenticatedHome() {
   const { hasPermission, isPlatformAdmin } = useAuth();
   if (isPlatformAdmin) return <Navigate to="/platform" replace />;
-  return hasPermission('REPORT_VIEW') ? <DashboardPage /> : <LandingPage />;
+  return hasPermission('REPORT_VIEW') ? <DashboardPage /> : <ActionLandingPage />;
+}
+
+/** Public marketing home or authenticated app home at `/`. */
+function RootIndex() {
+  const { token } = useAuth();
+  return token ? <AuthenticatedHome /> : <MarketingHome />;
 }
 
 function AppRoutes() {
@@ -89,8 +95,13 @@ function AppRoutes() {
     <Routes>
       <Route path="/login" element={token ? <Navigate to="/" replace /> : <LoginPage />} />
       <Route path="/register" element={token ? <Navigate to="/" replace /> : <RegisterPage />} />
-      <Route path="/" element={<PrivateRoute><Layout /></PrivateRoute>}>
-        <Route index element={<HomePage />} />
+
+      <Route path="/" element={<AppShell />}>
+        <Route index element={<RootIndex />} />
+        <Route path="features" element={<FeaturesPage />} />
+        <Route path="pricing" element={<PricingPage />} />
+        <Route path="privacy" element={<PrivacyPage />} />
+        <Route path="terms" element={<TermsPage />} />
         <Route path="tickets" element={<TicketsPage />} />
         <Route path="tickets/:id" element={<TicketDetailPage />} />
         <Route path="assets" element={<AssetsPage />} />
@@ -105,6 +116,7 @@ function AppRoutes() {
         <Route path="settings/push" element={<PushSettingsPage />} />
         <Route path="groups" element={<GroupsPage />} />
       </Route>
+
       <Route path="/platform" element={<PlatformAdminRoute><AdminLayout /></PlatformAdminRoute>}>
         <Route index element={<PlatformDashboardPage />} />
         <Route path="organizations" element={<PlatformOrganizationsPage />} />
@@ -117,6 +129,7 @@ function AppRoutes() {
         <Route path="system-config" element={<PlatformSystemConfigPage />} />
         <Route path="mobile-release" element={<PlatformMobileReleasePage />} />
       </Route>
+
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

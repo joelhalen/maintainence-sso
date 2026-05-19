@@ -1,6 +1,6 @@
 {
-  "tos": "",
+  "tos": "Test",
   "privacyPolicy": "",
-  "maintenanceMode": true,
+  "maintenanceMode": false,
   "platformName": "MegaMTX"
 }

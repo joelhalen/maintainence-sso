@@ -43,7 +43,7 @@ public class ApkInstallerPlugin extends Plugin {
                 call.reject(
                     "Allow installs from this app",
                     "UNKNOWN_SOURCES",
-                    null
+                    (JSObject) null
                 );
                 return;
             }

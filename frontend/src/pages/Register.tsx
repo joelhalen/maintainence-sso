@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import api from '../api/client';
 import UserAccountForm, { UserAccountFormValues } from '../components/UserAccountForm';
+import AuthPageLayout from '../components/marketing/AuthPageLayout';
 
 const emptyValues: UserAccountFormValues = {
   name: '',
@@ -86,48 +87,40 @@ export default function RegisterPage() {
 
   if (success) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-900 px-4">
-        <p className="text-white text-sm">Account created. Signing you in…</p>
-      </div>
+      <AuthPageLayout title="Welcome" subtitle="Your account is ready">
+        <p className="text-sm text-slate-600 text-center">Signing you in…</p>
+      </AuthPageLayout>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-900 px-4 py-10">
-      <div className="max-w-lg mx-auto">
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-14 h-14 rounded-xl bg-blue-600 mb-4">
-            <span className="text-white text-xl font-bold">M</span>
-          </div>
-          <h1 className="text-2xl font-bold text-white">Create your account</h1>
-          <p className="text-gray-400 text-sm mt-1">Join your organization on MegaMTX</p>
-        </div>
-
-        <div className="bg-white rounded-xl shadow-lg p-6 sm:p-8">
-          <UserAccountForm
-            mode="create"
-            variant="register"
-            values={values}
-            onChange={setValues}
-            orgSlug={orgSlug}
-            orgName={orgName}
-            onOrgSlugChange={setOrgSlug}
-            orgSlugValid={orgSlugValid}
-            orgSlugChecking={orgSlugChecking}
-            error={error}
-            submitting={submitting}
-            onSubmit={handleSubmit}
-            submitLabel="Create account"
-          />
-        </div>
-
-        <p className="text-center text-sm text-gray-400 mt-6">
+    <AuthPageLayout
+      title="Create your account"
+      subtitle="Join your organization with the code provided by your administrator"
+      footer={
+        <p className="text-center text-sm text-slate-500">
           Already have an account?{' '}
-          <Link to="/login" className="text-blue-400 hover:text-blue-300 font-medium">
+          <Link to="/login" className="text-blue-600 hover:text-blue-700 font-medium">
             Sign in
           </Link>
         </p>
-      </div>
-    </div>
+      }
+    >
+      <UserAccountForm
+        mode="create"
+        variant="register"
+        values={values}
+        onChange={setValues}
+        orgSlug={orgSlug}
+        orgName={orgName}
+        onOrgSlugChange={setOrgSlug}
+        orgSlugValid={orgSlugValid}
+        orgSlugChecking={orgSlugChecking}
+        error={error}
+        submitting={submitting}
+        onSubmit={handleSubmit}
+        submitLabel="Create account"
+      />
+    </AuthPageLayout>
   );
 }

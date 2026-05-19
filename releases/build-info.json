@@ -1,8 +1,13 @@
 {
-  "version": "1.0.0",
-  "builtAt": "2026-05-18T14:31:40Z",
+  "versionName": "1.0.0",
+  "versionCode": 2,
+  "minVersionCode": 2,
+  "apkUrl": "https://megamtx.joelhalen.net/download_apk",
+  "playStoreUrl": null,
+  "appStoreUrl": null,
+  "builtAt": "2026-05-19T11:33:35Z",
   "apiUrl": "https://megamtx.joelhalen.net/api",
   "apkFile": "megamtx-latest.apk",
-  "sha256": "aa50f05329222b6af989768c3c8f5e07a907d6254bd35f9a3dceaf6a6e00153f",
-  "bytes": 4777840
+  "sha256": "49c36d075dc68b1579fda9f6ac73d914e4c66cf70c760499a80ecd689a25458d",
+  "bytes": 4906740
 }
